@@ -127,6 +127,9 @@
                             {% if lemonsqueezy_enabled %}
                             <form method="post" action="{% url 'create_lemonsqueezy_checkout' reserva.id %}">
                                 {% csrf_token %}
+                                {% if request.GET.embed == '1' %}
+                                <input type="hidden" name="embed" value="1">
+                                {% endif %}
                                 <button type="submit"
                                     class="w-full bg-white text-slate-900 hover:bg-slate-100 font-black py-4 px-6 rounded-2xl shadow-lg transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3">
                                     <span class="material-icons text-primary">credit_card</span>
@@ -144,6 +147,9 @@
                             {% if request.user.is_staff or request.user.is_superuser %}
                             <form method="post" action="{% url 'procesar_pago_efectivo' reserva.id %}">
                                 {% csrf_token %}
+                                {% if request.GET.embed == '1' %}
+                                <input type="hidden" name="embed" value="1">
+                                {% endif %}
                                 <button type="submit"
                                     onclick="return confirm('¿Confirmas que recibiste el pago de esta reserva en efectivo físico?');"
                                     class="w-full bg-emerald-600 text-white hover:bg-emerald-700 font-black py-4 px-6 rounded-2xl shadow-lg transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 mt-4">
@@ -156,6 +162,9 @@
                             {% if group.name == 'secretaria' %}
                             <form method="post" action="{% url 'procesar_pago_efectivo' reserva.id %}">
                                 {% csrf_token %}
+                                {% if request.GET.embed == '1' %}
+                                <input type="hidden" name="embed" value="1">
+                                {% endif %}
                                 <button type="submit"
                                     onclick="return confirm('¿Confirmas que recibiste el pago de esta reserva en efectivo físico?');"
                                     class="w-full bg-emerald-600 text-white hover:bg-emerald-700 font-black py-4 px-6 rounded-2xl shadow-lg transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 mt-4">
@@ -192,11 +201,18 @@
                             </div>
 
                             <!-- Botón de Cancelar -->
-                            <a href="{% url 'tour_detalle' tour.id %}"
-                                class="text-xs font-bold text-slate-400 hover:text-white transition-colors flex items-center gap-2 uppercase tracking-wider py-2">
-                                <span class="material-icons text-sm">arrow_back</span>
-                                Cancelar y volver al tour
-                            </a>
+                            <form method="post" action="{% url 'cancelar_reserva_checkout' reserva.id %}">
+                                {% csrf_token %}
+                                {% if request.GET.embed == '1' %}
+                                <input type="hidden" name="embed" value="1">
+                                {% endif %}
+                                <button type="submit"
+                                    onclick="return confirm('¿Deseas cancelar esta reserva? Se liberarán los cupos.');"
+                                    class="text-xs font-bold text-slate-400 hover:text-white transition-colors flex items-center gap-2 uppercase tracking-wider py-2">
+                                    <span class="material-icons text-sm">arrow_back</span>
+                                    Cancelar reserva
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>

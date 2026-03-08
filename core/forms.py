@@ -1,5 +1,11 @@
 from django import forms
 from .models import Destino
+from .models import Tour
+from .models import Galeria, EmpresaConfig
+from django.contrib.auth.models import User
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.core.exceptions import ValidationError
+import re
 
 class DestinoForm(forms.ModelForm):
     class Meta:
@@ -19,8 +25,6 @@ class DestinoForm(forms.ModelForm):
 
 
 #destinotour
-from django import forms
-from .models import Destino, Tour
 
 class TourForm(forms.ModelForm):
     class Meta:
@@ -39,12 +43,6 @@ class TourForm(forms.ModelForm):
             'hora_turno_1': forms.TimeInput(attrs={'class': 'w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-primary', 'type': 'time'}),
             'hora_turno_2': forms.TimeInput(attrs={'class': 'w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-primary', 'type': 'time'}),
         }
-
-from django import forms
-from django.contrib.auth.models import User
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
-from django.core.exceptions import ValidationError
-import re
 
 class TuristaLoginForm(AuthenticationForm):
     def __init__(self, *args, **kwargs):
@@ -161,8 +159,6 @@ class RegistroTuristaForm(UserCreationForm):
         return password
     
 #formulario
-from django import forms
-
 class ContactoForm(forms.Form):
     # Asegúrate de que las opciones del Select coincidan con lo que quieres
     OPCIONES_ASUNTO = [
@@ -176,8 +172,6 @@ class ContactoForm(forms.Form):
     email = forms.EmailField()
     asunto = forms.ChoiceField(choices=OPCIONES_ASUNTO)
     mensaje = forms.CharField(widget=forms.Textarea)
-
-from .models import Galeria, EmpresaConfig
 
 class GaleriaForm(forms.ModelForm):
     class Meta:

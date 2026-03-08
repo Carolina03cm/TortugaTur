@@ -1,0 +1,100 @@
+{% extends "core/base.html" %}
+{% block title %}Actividad de Secretarias | TortugaTur{% endblock %}
+
+{% block content %}
+<main class="bg-slate-100 min-h-screen py-10">
+    <div class="max-w-7xl mx-auto px-6 lg:px-8">
+        <div class="dashboard-shell rounded-3xl overflow-hidden border border-slate-200 shadow-xl p-6 sm:p-8">
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-3xl font-black text-slate-900">Actividad Completa</h1>
+                <a href="{% url 'panel_admin' %}"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-black uppercase tracking-widest hover:border-primary hover:text-primary transition">
+                    Volver al panel
+                </a>
+            </div>
+
+            <form method="get" class="bg-white border border-slate-100 rounded-2xl p-4 mb-6 grid grid-cols-1 md:grid-cols-5 gap-3">
+                <div>
+                    <label class="block text-[10px] uppercase tracking-widest text-slate-400 font-black mb-1">Desde</label>
+                    <input type="date" name="desde" value="{{ filtro_desde|date:'Y-m-d' }}" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700">
+                </div>
+                <div>
+                    <label class="block text-[10px] uppercase tracking-widest text-slate-400 font-black mb-1">Hasta</label>
+                    <input type="date" name="hasta" value="{{ filtro_hasta|date:'Y-m-d' }}" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700">
+                </div>
+                <div>
+                    <label class="block text-[10px] uppercase tracking-widest text-slate-400 font-black mb-1">Tipo</label>
+                    <select name="tipo" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700">
+                        <option value="" {% if not filtro_tipo %}selected{% endif %}>Todos</option>
+                        <option value="reserva" {% if filtro_tipo == "reserva" %}selected{% endif %}>Reservas</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] uppercase tracking-widest text-slate-400 font-black mb-1">Secretaria</label>
+                    <select name="secretaria" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700" {% if not es_admin_panel %}disabled{% endif %}>
+                        <option value="">Todas</option>
+                        {% for s in secretarias %}
+                        <option value="{{ s.id }}" {% if filtro_secretaria == s.id|stringformat:'s' %}selected{% endif %}>{{ s.username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" class="w-full h-10 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest hover:bg-primary transition">Aplicar</button>
+                </div>
+            </form>
+
+            <div class="bg-white border border-slate-100 rounded-2xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] tracking-widest">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Tipo</th>
+                                <th class="px-4 py-3 text-left">Ref</th>
+                                <th class="px-4 py-3 text-left">Secretaria</th>
+                                <th class="px-4 py-3 text-left">Detalle</th>
+                                <th class="px-4 py-3 text-left">Estado</th>
+                                <th class="px-4 py-3 text-left">Hora</th>
+                                <th class="px-4 py-3 text-right">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in page_obj.object_list %}
+                            <tr class="border-t border-slate-100">
+                                <td class="px-4 py-3 text-xs font-black uppercase text-slate-500">{{ item.tipo }}</td>
+                                <td class="px-4 py-3 font-bold text-slate-700">#{{ item.id|stringformat:"05d" }}</td>
+                                <td class="px-4 py-3 text-slate-700">{{ item.usuario }}</td>
+                                <td class="px-4 py-3 text-slate-700">{{ item.titulo }} | {{ item.tour }}</td>
+                                <td class="px-4 py-3 text-slate-600 uppercase text-xs font-bold">{{ item.estado }}</td>
+                                <td class="px-4 py-3 text-slate-600">{{ item.dt|date:"d/m/Y h:i A" }}</td>
+                                <td class="px-4 py-3 text-right font-black text-slate-900">{% if item.monto %}${{ item.monto }}{% else %}-{% endif %}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="px-4 py-6 text-sm text-slate-400 italic">No hay actividad para los filtros seleccionados.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if page_obj.paginator.num_pages > 1 %}
+                <div class="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+                    <span class="text-xs text-slate-500">Pagina {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                    <div class="flex gap-2">
+                        {% if page_obj.has_previous %}
+                        <a href="?desde={{ filtro_desde|date:'Y-m-d' }}&hasta={{ filtro_hasta|date:'Y-m-d' }}&tipo={{ filtro_tipo }}&secretaria={{ filtro_secretaria }}&page={{ page_obj.previous_page_number }}" class="px-3 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:border-primary hover:text-primary">Anterior</a>
+                        {% endif %}
+                        {% if page_obj.has_next %}
+                        <a href="?desde={{ filtro_desde|date:'Y-m-d' }}&hasta={{ filtro_hasta|date:'Y-m-d' }}&tipo={{ filtro_tipo }}&secretaria={{ filtro_secretaria }}&page={{ page_obj.next_page_number }}" class="px-3 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:border-primary hover:text-primary">Siguiente</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</main>
+
+<style>
+    .dashboard-shell { background: #ffffff; }
+</style>
+{% endblock %}

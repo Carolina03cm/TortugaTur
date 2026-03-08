@@ -157,9 +157,19 @@
                                 Fecha y Horario</label>
                             <div class="relative">
                                 {% if user_is_agencia %}
-                                <input type="date" name="fecha_agencia" id="fechaAgencia" min="{% now 'Y-m-d' %}"
-                                    class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-primary/10 transition-all font-sans"
-                                    required onchange="recalcular()">
+                                <div class="space-y-3">
+                                    <input type="date" name="fecha_agencia" id="fechaAgencia" min="{% now 'Y-m-d' %}"
+                                        class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-primary/10 transition-all font-sans"
+                                        required onchange="actualizarHorariosAgencia(); recalcular()">
+                                    <select name="hora_turno_agencia" id="horaTurnoAgencia"
+                                        class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-slate-700 appearance-none outline-none focus:ring-4 focus:ring-primary/10 transition-all"
+                                        required onchange="recalcular()">
+                                        <option value="" disabled selected>Seleccionar horario...</option>
+                                        {% for h in agencia_horarios %}
+                                        <option value="{{ h|time:'H:i' }}">{{ h|time:"h:i A" }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
                                 {% else %}
                                 <select name="salida" id="selectSalida"
                                     class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-slate-700 appearance-none outline-none focus:ring-4 focus:ring-primary/10 transition-all"
@@ -383,6 +393,35 @@
     const precioNinoEdad6MasBase = parseFloat("{{ child_price_normal }}".replace(',', '.'));
 
     const usuarioLogueado = "{{ user.is_authenticated|yesno:'true,false' }}" === "true";
+    const turnosOcupadosAgencia = JSON.parse('{{ bloqueos_agencia_json|default:"{}"|safe|escapejs }}');
+
+    function actualizarHorariosAgencia() {
+        const fechaInput = document.getElementById('fechaAgencia');
+        const selectHorario = document.getElementById('horaTurnoAgencia');
+        if (!fechaInput || !selectHorario) return;
+
+        const fecha = fechaInput.value;
+        const ocupados = new Set(turnosOcupadosAgencia[fecha] || []);
+        let hayOpcionesLibres = false;
+
+        Array.from(selectHorario.options).forEach(opt => {
+            if (!opt.value) return;
+            const bloqueado = ocupados.has(opt.value);
+            opt.disabled = bloqueado;
+            opt.hidden = bloqueado;
+            if (!bloqueado) hayOpcionesLibres = true;
+        });
+
+        const seleccionActual = selectHorario.value;
+        if (seleccionActual && ocupados.has(seleccionActual)) {
+            selectHorario.value = "";
+        }
+
+        if (!hayOpcionesLibres && fecha) {
+            selectHorario.value = "";
+            mostrarError("Ese dia ya no tiene turnos libres para agencias.");
+        }
+    }
 
     function obtenerPrecioNinoPorEdadEnBase(edad) {
         if (isNaN(edad) || edad < 0) return 0;
@@ -535,7 +574,10 @@
     }
 
     // Ejecutar recalcular al inicio para pintar las duraciones correctas si ya hay una salida seleccionada
-    document.addEventListener("DOMContentLoaded", recalcular);
+    document.addEventListener("DOMContentLoaded", () => {
+        actualizarHorariosAgencia();
+        recalcular();
+    });
 
     function mostrarError(msg) {
         const error = document.getElementById('error-msg');
@@ -547,13 +589,15 @@
     function validarYPasar() {
         const select = document.getElementById('selectSalida');
         const dateInput = document.getElementById('fechaAgencia');
-        const hasDate = (select && select.value) || (dateInput && dateInput.value);
+        const agencyHour = document.getElementById('horaTurnoAgencia');
+        const hasDate = (select && select.value);
+        const hasAgencySlot = (dateInput && dateInput.value) && (agencyHour && agencyHour.value);
         const totalNinos = parseInt(document.getElementById('ninos').value) || 0;
         const totalGente = (parseInt(document.getElementById('adultos').value) || 0) + totalNinos;
         const edadesNinos = obtenerEdadesNinos();
 
-        if (!hasDate) {
-            mostrarError("Por favor, selecciona una fecha.");
+        if (!hasDate && !hasAgencySlot) {
+            mostrarError(dateInput ? "Por favor, selecciona fecha y horario." : "Por favor, selecciona una fecha.");
             return;
         }
         if (totalGente === 0) {

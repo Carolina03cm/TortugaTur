@@ -1,17 +1,11 @@
 from django.db import models
 
-# Create your models here.
-from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 
 
 
-from django.db import models
 
-from django.db import models
-from django.contrib.auth.models import User
-from django.utils import timezone
 
 class Destino(models.Model):
     nombre = models.CharField(max_length=100)
@@ -88,6 +82,9 @@ class Reserva(models.Model):
     archivo_agencia = models.FileField(upload_to='agencia_vouchers/', null=True, blank=True)
     codigo_agencia = models.CharField(max_length=50, null=True, blank=True)
     limite_pago_agencia = models.DateTimeField(null=True, blank=True)
+    alerta_24h_agencia_enviada_en = models.DateTimeField(null=True, blank=True)
+    hora_turno_agencia = models.TimeField(null=True, blank=True)
+    hora_turno_libre = models.TimeField(null=True, blank=True)
 
     # Datos del cliente
     nombre = models.CharField(max_length=100)
@@ -153,13 +150,13 @@ class Resena(models.Model):
         return f"{self.tour.nombre} - {self.puntuacion}⭐"
 
 #imagenes
-from django.db import models
-
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="perfil")
     foto = models.ImageField(upload_to="perfiles/", blank=True, null=True, help_text="Foto de perfil")
     telefono = models.CharField(max_length=20, blank=True, null=True)
     biografia = models.TextField(blank=True, null=True)
+    cedula = models.CharField(max_length=20, blank=True, default="")
+    force_password_change = models.BooleanField(default=False)
     is_agencia = models.BooleanField(default=False, verbose_name="Es agencia de tours", help_text="Si se activa, el usuario podrá bloquear reservas por 15 días")
 
     def __str__(self):
@@ -210,6 +207,7 @@ class Galeria(models.Model):
     def _aplicar_marca_agua(self):
         try:
             from PIL import Image, ImageDraw, ImageFont
+            from django.conf import settings
             import os
 
             if not self.imagen or not getattr(self.imagen, 'path', None):
@@ -228,22 +226,17 @@ class Galeria(models.Model):
             
             text = "TortugaTur"
             width, height = img.size
-            fontsize = max(int(width / 20), 12)  # Letra pequeña (1/20 del ancho)
+            # Compact watermark text.
+            fontsize = max(int(width / 62), 8)
 
             try:
                 import platform
                 if platform.system() == "Windows":
-                    font = ImageFont.truetype("arialbd.ttf", fontsize) # Arial bold
+                    font = ImageFont.truetype("arial.ttf", fontsize)
                 else:
-                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", fontsize)
+                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", fontsize)
             except Exception:
-                try:
-                    if platform.system() == "Windows":
-                        font = ImageFont.truetype("arial.ttf", fontsize)
-                    else:
-                        font = font = ImageFont.load_default()
-                except Exception:
-                    font = ImageFont.load_default()
+                font = ImageFont.load_default()
 
             try:
                 if hasattr(draw, "textbbox"):
@@ -255,21 +248,48 @@ class Galeria(models.Model):
             except Exception:
                 text_width, text_height = (fontsize * len(text) // 1.5, fontsize)
 
-            # Margen inferior derecho
-            margin_right = int(width * 0.03)
-            margin_bottom = int(height * 0.03)
-            x = width - text_width - margin_right
-            y = height - text_height - margin_bottom
+            margin_right = int(width * 0.018)
+            margin_bottom = int(height * 0.018)
 
-            # Sombra y Contorno grueso para asegurar lectura
-            color_sombra = (0, 0, 0, 200)
-            offsets = [(2,2), (-2,-2), (2,-2), (-2,2), (2,0), (-2,0), (0,2), (0,-2)]
-            for ox, oy in offsets:
-                draw.text((x + ox, y + oy), text, font=font, fill=color_sombra)
-                
-            # Texto principal en tono ligeramente translúcido
-            color_texto = (255, 255, 255, 180)
-            draw.text((x, y), text, font=font, fill=color_texto)
+            # Optional static logo watermark.
+            logo = None
+            logo_width = 0
+            logo_height = 0
+            logo_gap = max(int(width * 0.004), 4)
+            possible_logo_paths = [
+                os.path.join(settings.BASE_DIR, "core", "static", "icon", "logo.png"),
+                os.path.join(settings.BASE_DIR, "static", "icon", "logo.png"),
+            ]
+            for logo_path in possible_logo_paths:
+                if os.path.exists(logo_path):
+                    try:
+                        logo = Image.open(logo_path).convert("RGBA")
+                        logo_width = max(min(int(width * 0.035), 42), 20)
+                        ratio = logo_width / float(max(logo.size[0], 1))
+                        logo_height = max(int(logo.size[1] * ratio), 10)
+                        logo = logo.resize((logo_width, logo_height), Image.LANCZOS)
+
+                        # Subtle but readable opacity.
+                        alpha = logo.split()[3].point(lambda p: int(p * 0.36))
+                        logo.putalpha(alpha)
+                    except Exception:
+                        logo = None
+                    break
+
+            content_w = text_width + (logo_gap + logo_width if logo else 0)
+            content_h = max(text_height, logo_height)
+            text_x = width - content_w - margin_right
+            text_y = height - content_h - margin_bottom + max((content_h - text_height) // 2, 0)
+            logo_x = text_x + text_width + logo_gap
+            logo_y = height - content_h - margin_bottom + max((content_h - logo_height) // 2, 0)
+
+            # Minimal contrast bump for readability on bright sand/sky.
+            draw.text((text_x + 1, text_y + 1), text, font=font, fill=(0, 0, 0, 55))
+            color_texto = (245, 248, 250, 145)
+            draw.text((text_x, text_y), text, font=font, fill=color_texto)
+
+            if logo:
+                txt.alpha_composite(logo, dest=(logo_x, logo_y))
 
             watermarked = Image.alpha_composite(img, txt)
             
@@ -297,3 +317,4 @@ class EmpresaConfig(models.Model):
 
     def __str__(self):
         return f"{self.nombre_empresa} ({self.ruc or 'Sin RUC'})"
+

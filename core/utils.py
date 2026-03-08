@@ -2,9 +2,10 @@ from io import BytesIO
 import hashlib
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfgen import canvas
 from reportlab.graphics.barcode import code128
-from reportlab.platypus import Table, TableStyle
+from reportlab.platypus import Table, TableStyle, SimpleDocTemplate, Paragraph, Spacer
 
 
 def _fmt_money(value):
@@ -233,82 +234,163 @@ def generar_ticket_pdf(reserva, empresa=None):
     return buffer
 
 
-def generar_actividad_dia_pdf(titulo, fecha, items, resumen):
+def generar_actividad_dia_pdf(titulo, fecha, items, resumen, empresa=None):
     buffer = BytesIO()
-    p = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
 
     color_primary = colors.HexColor("#0F172A")
     color_border = colors.HexColor("#CBD5E1")
     color_light = colors.HexColor("#F8FAFC")
+    color_muted = colors.HexColor("#64748B")
 
-    margin_x = 34
-    y_top = height - 42
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=28,
+        rightMargin=28,
+        topMargin=26,
+        bottomMargin=28,
+        title="Reporte de Actividad Diaria",
+    )
 
-    p.setFillColor(color_primary)
-    p.roundRect(20, height - 118, width - 40, 88, 12, fill=1, stroke=0)
-    p.setFillColor(colors.white)
-    p.setFont("Helvetica-Bold", 18)
-    p.drawString(margin_x, height - 66, "REPORTE DE ACTIVIDAD DIARIA")
-    p.setFont("Helvetica", 11)
-    p.drawString(margin_x, height - 84, str(titulo))
-    p.drawRightString(width - margin_x, height - 84, f"Fecha: {fecha.strftime('%d/%m/%Y')}")
-    p.drawRightString(width - margin_x, height - 100, f"Registros: {resumen.get('total_registros', 0)}")
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "ActividadTitle",
+        parent=styles["Heading1"],
+        fontName="Helvetica-Bold",
+        fontSize=15,
+        textColor=color_primary,
+        spaceAfter=6,
+    )
+    meta_style = ParagraphStyle(
+        "ActividadMeta",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=9,
+        textColor=color_muted,
+        leading=12,
+    )
+    foot_style = ParagraphStyle(
+        "ActividadFoot",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8,
+        textColor=color_muted,
+    )
+    cell_style = ParagraphStyle(
+        "ActividadCell",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=7.5,
+        leading=9,
+        textColor=colors.HexColor("#0F172A"),
+    )
+    amount_style = ParagraphStyle(
+        "ActividadAmount",
+        parent=cell_style,
+        alignment=2,  # right
+    )
 
-    data = [["Tipo", "Ref", "Secretaria", "Detalle", "Estado", "Hora", "Monto"]]
+    empresa_nombre = "TortugaTur"
+    empresa_ruc = ""
+    empresa_direccion = ""
+    empresa_telefono = ""
+    empresa_correo = ""
+    if empresa is not None:
+        empresa_nombre = getattr(empresa, "nombre_empresa", "") or empresa_nombre
+        empresa_ruc = getattr(empresa, "ruc", "") or ""
+        empresa_direccion = getattr(empresa, "direccion", "") or ""
+        empresa_telefono = getattr(empresa, "telefono", "") or ""
+        empresa_correo = getattr(empresa, "correo", "") or ""
+
+    story = [
+        Paragraph("REPORTE DE ACTIVIDAD DIARIA", title_style),
+        Paragraph(f"Empresa: {_safe_text(empresa_nombre)}", meta_style),
+        Paragraph(f"RUC: {_safe_text(empresa_ruc, 'No configurado')}", meta_style),
+        Paragraph(_safe_text(titulo), meta_style),
+        Paragraph(
+            f"Fecha: {fecha.strftime('%d/%m/%Y')} | Registros: {int(resumen.get('total_registros', 0) or 0)}",
+            meta_style,
+        ),
+        Paragraph(
+            f"Direccion: {_safe_text(empresa_direccion)} | Telefono: {_safe_text(empresa_telefono)} | Correo: {_safe_text(empresa_correo)}",
+            meta_style,
+        ),
+        Spacer(1, 10),
+    ]
+
+    data = [["Tipo", "Ref", "Usuario", "Detalle", "Estado", "Hora", "Monto"]]
     for item in items:
-        hora = item["dt"].strftime("%I:%M %p")
-        monto = f"${float(item['monto']):.2f}" if item.get("monto") else "-"
-        ref = f"#{int(item['id']):05d}"
-        detalle = f"{item.get('titulo', '')} | {item.get('tour', '')}"
-        usuario = str(item.get("usuario", "-"))
+        dt = item.get("dt")
+        hora = dt.strftime("%I:%M %p") if dt else "-"
+        monto_raw = item.get("monto")
+        monto = f"${float(monto_raw):.2f}" if monto_raw is not None else "-"
+        ref = f"#{int(item.get('id', 0)):05d}" if item.get("id") else "-"
+        detalle = f"{_safe_text(item.get('titulo', ''))} | {_safe_text(item.get('tour', ''))}"
+        usuario = _safe_text(item.get("usuario", "-"))
+        estado_raw = _safe_text(item.get("estado", "-"))
+        estado_pretty = estado_raw.replace("_", " ")
         data.append([
-            str(item.get("tipo", "")).upper(),
-            ref,
-            usuario,
-            detalle,
-            str(item.get("estado", "")).upper(),
-            hora,
-            monto,
+            Paragraph(str(item.get("tipo", "")).upper(), cell_style),
+            Paragraph(ref, cell_style),
+            Paragraph(usuario, cell_style),
+            Paragraph(detalle, cell_style),
+            Paragraph(estado_pretty.upper(), cell_style),
+            Paragraph(hora, cell_style),
+            Paragraph(monto, amount_style),
         ])
 
     if len(data) == 1:
-        data.append(["-", "-", "-", "No hay actividad para esta fecha.", "-", "-", "-"])
+        data.append([
+            Paragraph("-", cell_style),
+            Paragraph("-", cell_style),
+            Paragraph("-", cell_style),
+            Paragraph("No hay actividad para esta fecha.", cell_style),
+            Paragraph("-", cell_style),
+            Paragraph("-", cell_style),
+            Paragraph("-", amount_style),
+        ])
 
-    data.append(["", "", "", "", "", "TOTAL VENTAS", f"${float(resumen.get('total_ventas', 0)):,.2f}"])
+    total_ventas = float(resumen.get("total_ventas", 0) or 0)
+    data.append([
+        "",
+        "",
+        "",
+        "",
+        "",
+        Paragraph("TOTAL VENTAS", cell_style),
+        Paragraph(f"${total_ventas:,.2f}", amount_style),
+    ])
 
-    row_heights = [22] + [20] * (len(data) - 2) + [24]
-    table = Table(data, colWidths=[50, 55, 80, 160, 80, 60, 65], rowHeights=row_heights)
-    style = [
-        ("BACKGROUND", (0, 0), (-1, 0), color_primary),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, 0), 8),
-        ("GRID", (0, 0), (-1, -2), 0.5, color_border),
-        ("ALIGN", (0, 0), (2, -1), "CENTER"),
-        ("ALIGN", (5, 0), (6, -1), "RIGHT"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("FONTNAME", (5, -1), (6, -1), "Helvetica-Bold"),
-        ("BACKGROUND", (0, -1), (-1, -1), color_light),
-        ("LINEABOVE", (0, -1), (-1, -1), 1, color_primary),
-    ]
-    table.setStyle(TableStyle(style))
+    table = Table(
+        data,
+        colWidths=[44, 50, 70, 160, 100, 56, 62],
+        repeatRows=1,
+        hAlign="LEFT",
+    )
+    table.setStyle(
+        TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), color_primary),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+            ("TOPPADDING", (0, 0), (-1, 0), 6),
+            ("GRID", (0, 0), (-1, -2), 0.5, color_border),
+            ("ALIGN", (0, 0), (2, -1), "CENTER"),
+            ("ALIGN", (3, 1), (4, -2), "LEFT"),
+            ("ALIGN", (5, 0), (6, -1), "RIGHT"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("FONTSIZE", (0, 1), (-1, -1), 7.5),
+            ("FONTNAME", (5, -1), (6, -1), "Helvetica-Bold"),
+            ("BACKGROUND", (0, -1), (-1, -1), color_light),
+            ("LINEABOVE", (0, -1), (-1, -1), 1, color_primary),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#F8FAFC")]),
+        ])
+    )
+    story.append(table)
+    story.append(Spacer(1, 8))
+    story.append(Paragraph("Reporte generado desde el panel de gestion - TortugaTur.", foot_style))
 
-    table_h = sum(row_heights)
-    y_table = y_top - 110 - table_h
-    if y_table < 70:
-        y_table = 70
-    table.wrapOn(p, margin_x, y_table)
-    table.drawOn(p, margin_x, y_table)
-
-    p.setStrokeColor(color_border)
-    p.line(margin_x, 52, width - margin_x, 52)
-    p.setFillColor(colors.HexColor("#64748B"))
-    p.setFont("Helvetica", 8)
-    p.drawString(margin_x, 40, "Reporte generado desde el panel de gestion.")
-    p.drawRightString(width - margin_x, 40, "TortugaTur")
-
-    p.showPage()
-    p.save()
+    doc.build(story)
     buffer.seek(0)
     return buffer

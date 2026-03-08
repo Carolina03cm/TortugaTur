@@ -23,16 +23,34 @@
             </a>
         </div>
 
-        <!-- GANANCIAS TOTALES -->
-        <div id="seccion-reporte" class="grid grid-cols-1 mb-10">
-            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col justify-center">
+        <!-- RESUMEN FINANCIERO -->
+        <div id="seccion-reporte" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                 <span class="text-slate-400 text-xs font-bold uppercase tracking-widest">Ganancias Totales</span>
-                <h2 id="total-ganancias-display" class="text-5xl font-black text-slate-900 mt-2">$0.00</h2>
+                <h2 class="text-4xl font-black text-slate-900 mt-2">${{ resumen_financiero_reservas.ingresos_total|default:"0.00"|floatformat:2 }}</h2>
                 <p class="text-green-500 text-xs font-bold mt-2 flex items-center gap-1">
-                    <span class="material-icons text-sm">trending_up</span> Basado en reservas pagadas
+                    <span class="material-icons text-sm">trending_up</span> Reservas pagadas (global)
                 </p>
             </div>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <span class="text-slate-400 text-xs font-bold uppercase tracking-widest">Ingresos del Mes</span>
+                <h2 class="text-4xl font-black text-slate-900 mt-2">${{ resumen_financiero_reservas.ingresos_mes|default:"0.00"|floatformat:2 }}</h2>
+                <p class="text-slate-500 text-xs font-bold mt-2">Acumulado mensual</p>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <span class="text-slate-400 text-xs font-bold uppercase tracking-widest">Ingresos del Año</span>
+                <h2 class="text-4xl font-black text-slate-900 mt-2">${{ resumen_financiero_reservas.ingresos_anio|default:"0.00"|floatformat:2 }}</h2>
+                <p class="text-slate-500 text-xs font-bold mt-2">Acumulado anual</p>
+            </div>
         </div>
+        {% if request.GET.fecha and resumen_financiero_reservas.ingresos_fecha_filtro != None %}
+        <div class="mb-6">
+            <span class="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg">
+                <span class="material-icons text-sm">calendar_today</span>
+                Total pagado para {{ request.GET.fecha }}: ${{ resumen_financiero_reservas.ingresos_fecha_filtro|floatformat:2 }}
+            </span>
+        </div>
+        {% endif %}
 
         <!-- BUSCADOR Y FILTROS -->
         <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
@@ -115,6 +133,15 @@
                                     {% if r.limite_pago_agencia %}
                                     <span>Límite: <b>{{ r.limite_pago_agencia|date:"d M Y" }}</b></span><br>
                                     {% endif %}
+                                    {% if r.hora_turno_agencia %}
+                                    <span>Turno agencia: <b>{{ r.hora_turno_agencia|time:"h:i A" }}</b></span><br>
+                                    {% endif %}
+                                    {% if r.hora_turno_libre %}
+                                    <span>Turno libre: <b>{{ r.hora_turno_libre|time:"h:i A" }}</b></span><br>
+                                    {% endif %}
+                                    {% if r.penalizacion_pendiente %}
+                                    <span class="text-red-700">Penalizacion pendiente: <b>${{ r.monto_penalizacion }}</b></span><br>
+                                    {% endif %}
                                     {% if r.archivo_agencia %}
                                     <a href="{{ r.archivo_agencia.url }}" target="_blank"
                                         class="underline flex items-center gap-1 mt-1 text-blue-700 hover:text-blue-900 border-none">
@@ -134,7 +161,17 @@
                                 </span>
                             </td>
                             <td class="px-8 py-6 text-center">
-                                {% if r.estado == "pagada" or r.tiene_pago %}
+                                {% if r.es_reserva_agencia %}
+                                <div class="inline-flex items-center gap-2">
+                                    {% if r.estado == "pagada" or r.tiene_pago %}
+                                    <a href="{% url 'ver_ticket_pdf' r.id %}" target="_blank"
+                                        class="bg-indigo-600 text-white px-3 py-1 rounded-lg text-xs">Ver PDF</a>
+                                    {% endif %}
+                                    <span class="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-xs font-bold">
+                                        Solo gestion agencia
+                                    </span>
+                                </div>
+                                {% elif r.estado == "pagada" or r.tiene_pago %}
                                 <div class="inline-flex items-center gap-2">
                                     <a href="{% url 'ver_ticket_pdf' r.id %}" target="_blank"
                                         class="bg-indigo-600 text-white px-3 py-1 rounded-lg text-xs">Ver PDF</a>
@@ -186,23 +223,6 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
-        const filas = document.querySelectorAll('.reserva-row');
-        let granTotal = 0;
-
-        filas.forEach(fila => {
-            const montoTexto = fila.querySelector('.monto-total').innerText.replace('$', '').replace(',', '').trim();
-            const monto = parseFloat(montoTexto);
-            const estado = fila.querySelector('.estado-label').innerText.toLowerCase();
-
-            if (estado.includes('pagada')) {
-                granTotal += monto;
-            }
-        });
-
-        document.getElementById('total-ganancias-display').innerText =
-            `$${granTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    });
 </script>
 
 {% endblock %}

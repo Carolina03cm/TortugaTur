@@ -1,4 +1,4 @@
-{% extends "core/base.html" %}
+﻿{% extends "core/base.html" %}
 
 {% block title %}Mi Perfil | TortugaTur{% endblock %}
 
@@ -7,36 +7,60 @@
     <div class="max-w-4xl mx-auto">
 
         <!-- Cabecera -->
-        {% if not is_secretaria %}
-        <div class="text-center mb-10">
-            <span
-                class="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-4 inline-block">Área
-                de Administración</span>
-            <h1 class="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">Mi Perfil</h1>
-            <p class="text-slate-500 dark:text-slate-400 mt-2">Gestiona tu identidad, credenciales e información de
-                contacto del administrador.</p>
-        </div>
-        {% else %}
-        <div class="text-center mb-10">
-            <span
-                class="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-4 inline-block">Panel de Secretaria</span>
-            <h1 class="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">Mi Perfil</h1>
-            <p class="text-slate-500 dark:text-slate-400 mt-2">Aquí puedes ver tu información de usuario y tus ventas.</p>
-        </div>
-        {% endif %}
-        
-        {% if messages %}
-        <div class="mb-8 space-y-2">
-            {% for message in messages %}
-            <div
-                class="p-4 rounded-xl text-sm font-bold {% if message.tags == 'success' %}bg-emerald-50 text-emerald-600 border border-emerald-100{% else %}bg-amber-50 text-amber-600 border border-amber-100{% endif %}">
-                {{ message }}
+        {% if not force_password_change %}
+            {% if not is_secretaria %}
+            <div class="text-center mb-10">
+                <span
+                    class="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-4 inline-block">Área
+                    de Administración</span>
+                <h1 class="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">Mi Perfil</h1>
+                <p class="text-slate-500 dark:text-slate-400 mt-2">Gestiona tu identidad, credenciales e información de
+                    contacto del administrador.</p>
             </div>
-            {% endfor %}
-        </div>
+            {% else %}
+            <div class="text-center mb-10">
+                <span
+                    class="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-4 inline-block">Panel de Secretaria</span>
+                <h1 class="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">Mi Perfil</h1>
+                <p class="text-slate-500 dark:text-slate-400 mt-2">Aquí puedes ver tu información de usuario y tus ventas.</p>
+            </div>
+            {% endif %}
         {% endif %}
 
-        {% if not is_secretaria %}
+        {% if force_password_change %}
+        <div class="mb-5 flex justify-center">
+            <img src="/static/icon/logo.png" alt="TortugaTur" class="h-24 w-auto object-contain">
+        </div>
+        <div class="mb-8 rounded-3xl border border-amber-200 bg-white shadow-sm overflow-hidden">
+            <div class="px-5 py-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200 flex items-center gap-2">
+                <span class="material-icons text-amber-600 text-base">priority_high</span>
+                <p class="text-[11px] font-black uppercase tracking-widest text-amber-700">Cambio obligatorio</p>
+            </div>
+            <div class="px-5 py-4">
+                <p class="text-sm font-semibold text-slate-700">Tu cuenta tiene una contraseña temporal. Debes cambiarla para seguir usando el sistema.</p>
+            </div>
+        </div>
+
+        <form method="post" class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+            {% csrf_token %}
+            <div class="p-6 sm:p-8">
+                <div class="grid grid-cols-1 md:grid-cols-[1fr,240px] gap-3 items-end">
+                    <div>
+                        <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Nueva contraseña</label>
+                        <input type="password" name="new_password" minlength="6" required
+                            placeholder="Nueva contraseña (mínimo 6 caracteres)"
+                            class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-semibold focus:ring-2 focus:ring-primary outline-none">
+                    </div>
+                    <button type="submit"
+                        class="h-11 rounded-xl bg-slate-900 text-white font-black text-xs tracking-widest hover:bg-black transition">
+                        GUARDAR Y ENTRAR DE NUEVO
+                    </button>
+                </div>
+            </div>
+        </form>
+        {% endif %}
+
+        {% if not force_password_change and not is_secretaria %}
         <form method="post" enctype="multipart/form-data"
             class="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
             {% csrf_token %}
@@ -140,7 +164,7 @@
                             <label
                                 class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Nueva
                                 Contraseña (Dejar en blanco para no cambiar)</label>
-                            <input type="password" name="new_password" placeholder="••••••••••••"
+                            <input type="password" name="new_password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                                 class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-3 text-sm text-slate-800 dark:text-white font-bold focus:ring-2 focus:ring-primary outline-none">
                         </div>
                     </div>
@@ -161,7 +185,23 @@
         {% endif %}
 
         <!-- Datos del Perfil para Secretarias -->
-        {% if is_secretaria %}
+        {% if not force_password_change and is_secretaria %}
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+            <div class="bg-gradient-to-r from-slate-100 to-slate-50 p-6 border-b border-slate-200">
+                <h3 class="text-lg font-black text-slate-900 flex items-center gap-2">
+                    <span class="material-icons text-primary">lock</span> Perfil en modo solo lectura
+                </h3>
+                <p class="text-xs text-slate-600 mt-1">Tu información es administrada por el usuario administrador.</p>
+                <div class="mt-4">
+                    <a href="{% url 'panel_admin' %}"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs tracking-widest text-white bg-slate-900 hover:bg-black transition">
+                        <span class="material-icons text-sm">dashboard</span>
+                        VOLVER AL DASHBOARD
+                    </a>
+                </div>
+            </div>
+        </div>
+
         <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden p-8 mb-8">
             <h3 class="text-lg font-black text-slate-900 flex items-center gap-2 mb-6">
                 <span class="material-icons text-primary">person</span> Mi Información
@@ -186,159 +226,6 @@
             </div>
         </div>
 
-        <!-- SECCIÓN DE VENTAS PARA SECRETARIAS -->
-        <div class="mt-12 bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
-            <div class="bg-gradient-to-r from-primary to-primary/80 p-8 text-white">
-                <h2 class="text-2xl font-black flex items-center gap-2">
-                    <span class="material-icons">trending_up</span> Mis Ventas
-                </h2>
-                <p class="text-primary-light mt-1 text-sm">Resumen de todas las reservas que has creado</p>
-            </div>
-
-            <div class="p-8">
-                <!-- Estadísticas -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div class="bg-slate-50 rounded-2xl p-6 text-center">
-                        <p class="text-slate-500 text-xs font-bold uppercase tracking-widest">Total de Reservas</p>
-                        <p class="text-4xl font-black text-slate-900 mt-2">{{ reservas_creadas|length }}</p>
-                    </div>
-                    <div class="bg-emerald-50 rounded-2xl p-6 text-center">
-                        <p class="text-emerald-600 text-xs font-bold uppercase tracking-widest">Ingresos Generados</p>
-                        <p class="text-4xl font-black text-emerald-700 mt-2">${{ total_ventas|floatformat:2 }}</p>
-                    </div>
-                    <div class="bg-blue-50 rounded-2xl p-6 text-center">
-                        <p class="text-blue-600 text-xs font-bold uppercase tracking-widest">Pasajeros Atendidos</p>
-                        <p class="text-4xl font-black text-blue-700 mt-2">{{ total_personas }}</p>
-                    </div>
-                </div>
-
-                <!-- Tickets de Ventas -->
-                {% if reservas_creadas %}
-                <h3 class="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
-                    <span class="material-icons text-primary">confirmation_number</span> Tickets de Mis Ventas
-                </h3>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {% for reserva in reservas_creadas %}
-                    <div
-                        class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-lg transition-all">
-                        <!-- Encabezado del Ticket -->
-                        <div
-                            class="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 border-b-2 border-dashed border-slate-600">
-                            <div class="flex justify-between items-start mb-3">
-                                <div>
-                                    <p class="text-[10px] uppercase font-bold tracking-widest text-slate-300">Referencia
-                                    </p>
-                                    <p class="text-2xl font-black">#{{ reserva.id|stringformat:"05d" }}</p>
-                                </div>
-                                <div class="text-right">
-                                    <span class="px-3 py-1 rounded-lg text-xs font-bold {% if reserva.estado == 'pagada' or reserva.tiene_pago %}bg-emerald-500/20 text-emerald-300{% elif reserva.estado == 'pendiente' %}bg-yellow-500/20 text-yellow-300{% elif reserva.estado == 'cancelada' %}bg-red-500/20 text-red-300{% else %}bg-slate-500/20 text-slate-200{% endif %}">
-                                        {% if reserva.estado == 'pagada' or reserva.tiene_pago %}PAGADA{% elif reserva.estado == 'pendiente' %}PENDIENTE{% elif reserva.estado == 'cancelada' %}CANCELADA{% else %}{{ reserva.estado|upper }}{% endif %}
-                                    </span>
-                                </div>
-                            </div>
-                            <p class="text-xs text-slate-300">{{ reserva.fecha_reserva|date:"d de F de Y - h:i A" }}</p>
-                        </div>
-
-                        <!-- Detalles del Pasajero -->
-                        <div class="p-6 border-b border-slate-200">
-                            <p class="text-xs text-slate-500 uppercase font-bold tracking-widest mb-1">Pasajero</p>
-                            <p class="text-lg font-black text-slate-900">{{ reserva.nombre }} {{ reserva.apellidos }}
-                            </p>
-                            <p class="text-xs text-slate-600 mt-2">📧 {{ reserva.correo }}</p>
-                            <p class="text-xs text-slate-600">📱 {{ reserva.telefono }}</p>
-                        </div>
-
-                        <!-- Detalles del Tour y Salida -->
-                        <div class="p-6 border-b border-slate-200">
-                            <p class="text-xs text-slate-500 uppercase font-bold tracking-widest mb-2">Tour Reservado
-                            </p>
-                            <p class="text-base font-black text-primary">{{ reserva.salida.tour.nombre }}</p>
-                            <p class="text-xs text-slate-600 mt-2">
-                                <span class="material-icons text-sm align-middle">calendar_today</span>
-                                {{ reserva.salida.fecha|date:"d/m/Y" }}
-                                {% if reserva.salida.hora %}· {{ reserva.salida.hora|time:"h:i A" }}{% endif %}
-                            </p>
-                        </div>
-
-                        <!-- Detalles de Pasajeros y Monto -->
-                        <div class="p-6 bg-slate-100">
-                            <div class="grid grid-cols-3 gap-4 mb-4">
-                                <div class="text-center">
-                                    <p class="text-xs text-slate-600 uppercase font-bold">Adultos</p>
-                                    <p class="text-2xl font-black text-slate-900">{{ reserva.adultos }}</p>
-                                </div>
-                                <div class="text-center border-x border-slate-300">
-                                    <p class="text-xs text-slate-600 uppercase font-bold">Niños</p>
-                                    <p class="text-2xl font-black text-slate-900">{{ reserva.ninos }}</p>
-                                </div>
-                                <div class="text-center">
-                                    <p class="text-xs text-slate-600 uppercase font-bold">Total</p>
-                                    <p class="text-2xl font-black text-slate-900">{{ reserva.total_personas }}</p>
-                                </div>
-                            </div>
-
-                            <div class="bg-white rounded-xl p-4 border-2 border-slate-900">
-                                <p class="text-xs text-slate-600 uppercase font-bold tracking-widest">Monto Total</p>
-                                <p class="text-3xl font-black text-emerald-600">${{ reserva.total_pagar|floatformat:2 }}
-                                </p>
-                            </div>
-
-                            {% if reserva.estado == 'pendiente' %}
-                            <div class="mt-4 grid grid-cols-2 gap-2">
-                                <button type="button"
-                                    onclick="toggleEditarReserva('{{ reserva.id }}')"
-                                    class="h-10 rounded-xl bg-amber-100 text-amber-700 font-black text-xs tracking-widest hover:bg-amber-200 transition">
-                                    EDITAR
-                                </button>
-                                <form method="post" onsubmit="return confirm('¿Cancelar esta reserva pendiente?')">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="action" value="cancelar_reserva_pendiente">
-                                    <input type="hidden" name="reserva_id" value="{{ reserva.id }}">
-                                    <button type="submit"
-                                        class="w-full h-10 rounded-xl bg-red-100 text-red-700 font-black text-xs tracking-widest hover:bg-red-200 transition">
-                                        CANCELAR
-                                    </button>
-                                </form>
-                            </div>
-
-                            <form id="editar-reserva-{{ reserva.id }}" method="post"
-                                class="hidden mt-3 p-3 rounded-xl border border-slate-200 bg-white space-y-2">
-                                {% csrf_token %}
-                                <input type="hidden" name="action" value="editar_reserva_pendiente">
-                                <input type="hidden" name="reserva_id" value="{{ reserva.id }}">
-                                <div class="grid grid-cols-2 gap-2">
-                                    <input type="text" name="nombre" value="{{ reserva.nombre }}" placeholder="Nombre"
-                                        class="w-full border border-slate-200 rounded-lg p-2 text-sm font-semibold" required>
-                                    <input type="text" name="apellidos" value="{{ reserva.apellidos }}" placeholder="Apellidos"
-                                        class="w-full border border-slate-200 rounded-lg p-2 text-sm font-semibold" required>
-                                </div>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <input type="email" name="correo" value="{{ reserva.correo }}" placeholder="Correo"
-                                        class="w-full border border-slate-200 rounded-lg p-2 text-sm font-semibold" required>
-                                    <input type="text" name="telefono" value="{{ reserva.telefono }}" placeholder="Telefono"
-                                        class="w-full border border-slate-200 rounded-lg p-2 text-sm font-semibold" required>
-                                </div>
-                                <input type="text" name="identificacion" value="{{ reserva.identificacion }}" placeholder="Cedula o pasaporte"
-                                    class="w-full border border-slate-200 rounded-lg p-2 text-sm font-semibold" required>
-                                <button type="submit"
-                                    class="w-full h-9 rounded-lg bg-slate-900 text-white font-black text-xs tracking-widest hover:bg-primary transition">
-                                    GUARDAR CAMBIOS
-                                </button>
-                            </form>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="bg-slate-50 rounded-2xl p-12 text-center">
-                    <span class="material-icons text-5xl text-slate-300 block mb-4">shopping_cart_checkout</span>
-                    <p class="text-slate-500 font-bold text-lg">Aún no has creado ninguna venta</p>
-                    <p class="text-slate-400 text-sm mt-1">Tus tickets de ventas aparecerán aquí</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
         {% endif %}
     </div>
 </div>
@@ -363,14 +250,8 @@
         }
     }
 
-    function toggleEditarReserva(reservaId) {
-        const form = document.getElementById(`editar-reserva-${reservaId}`);
-        if (!form) return;
-        form.classList.toggle('hidden');
-        if (!form.classList.contains('hidden')) {
-            const firstInput = form.querySelector('input[name="nombre"]');
-            if (firstInput) firstInput.focus();
-        }
-    }
 </script>
 {% endblock %}
+
+
+

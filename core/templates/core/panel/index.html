@@ -1,601 +1,1749 @@
-﻿{% extends "core/base.html" %}
+{% extends "core/base.html" %}
 {% block title %}Admin Dashboard | TortugaTur{% endblock %}
 
 {% block content %}
-<main class="bg-[#f8fafc] min-h-screen py-16" role="main">
-    <div class="max-w-7xl mx-auto px-6 lg:px-8">
+<main id="dashRoot" class="bg-slate-100 min-h-screen py-0" role="main" style="visibility:hidden;">
+    <div class="w-full mx-0 px-0">
+        <div class="dashboard-shell min-h-screen rounded-none overflow-hidden border-0 shadow-none">
+            <button id="mobileSidebarToggleBtn" type="button" class="dash-mobile-toggle" aria-label="Abrir o cerrar menu">
+                <span id="mobileSidebarToggleIcon" class="material-icons">menu</span>
+            </button>
+            <div id="sidebarBackdrop" class="dash-backdrop hidden"></div>
+            <div id="dashLayout" class="dash-layout sidebar-collapsed">
+                <aside id="panelSidebar" class="dash-sidebar-shell">
+                    <div class="dash-sidepanel">
+                        <div class="dash-sidepanel-inner">
+                            <div class="mb-5 dash-toggle-wrap">
+                                <button id="sidebarToggleBtn" type="button" class="dash-toggle-btn" aria-label="Abrir o cerrar menu">
+                                    <span id="sidebarToggleIcon" class="material-icons">menu</span>
+                                </button>
+                            </div>
+                            <nav class="dash-mini-nav">
+                                <a href="{% url 'panel_admin' %}" class="dash-mini-link active" title="Dashboard"><span class="material-icons">dashboard</span></a>
+                                {% if request.user.is_superuser or request.user.is_staff %}
+                                <a href="{% url 'destinos' %}" data-panel-url="{% url 'destinos' %}" class="dash-mini-link" title="Destinos"><span class="material-icons">place</span></a>
+                                <a href="{% url 'admin_tours' %}" data-panel-url="{% url 'admin_tours' %}" class="dash-mini-link" title="Tours"><span class="material-icons">map</span></a>
+                                {% endif %}
+                                <a href="{% url 'admin_salidas' %}" data-panel-url="{% url 'admin_salidas' %}" class="dash-mini-link" title="Salidas"><span class="material-icons">event_note</span></a>
+                                {% if request.user.is_superuser or request.user.is_staff %}
+                                <a href="{% url 'admin_reservas' %}" data-panel-url="{% url 'admin_reservas' %}" class="dash-mini-link" title="Reservas"><span class="material-icons">event_available</span></a>
+                                <a href="{% url 'admin_agencias' %}" data-panel-url="{% url 'admin_agencias' %}" class="dash-mini-link" title="Agencias"><span class="material-icons">apartment</span></a>
+                                <a href="{% url 'admin_secretarias' %}" data-panel-url="{% url 'admin_secretarias' %}" class="dash-mini-link" title="Secretarias"><span class="material-icons">groups</span></a>
+                                <a href="{% url 'empresa_config' %}" data-panel-url="{% url 'empresa_config' %}" class="dash-mini-link" title="Empresa"><span class="material-icons">badge</span></a>
+                                <a href="{% url 'panel_galeria' %}" data-panel-url="{% url 'panel_galeria' %}" class="dash-mini-link" title="Galeria"><span class="material-icons">photo_library</span></a>
+                                {% endif %}
+                                <a href="{% url 'secretaria_reservar' %}" data-panel-url="{% url 'secretaria_reservar' %}" class="dash-mini-link" title="Reserva Asistida"><span class="material-icons">support_agent</span></a>
+                                <a href="{% url 'panel_actividad' %}" data-panel-url="{% url 'panel_actividad' %}" class="dash-mini-link" title="Actividad"><span class="material-icons">history</span></a>
+                            </nav>
+                            <div class="text-center mb-8">
+                                {% if panel_profile_url %}
+                                <img src="{{ panel_profile_url }}" alt="Foto de perfil" class="w-16 h-16 mx-auto rounded-full object-cover border-2 border-cyan-300/60">
+                                {% else %}
+                                <div class="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-pink-300 to-violet-300 text-slate-900 font-black flex items-center justify-center text-xl">
+                                    {{ user.username|slice:":1"|upper }}
+                                </div>
+                                {% endif %}
+                                <p class="mt-3 text-white font-bold">{{ user.username }}</p>
+                                <p class="text-[11px] text-slate-300 uppercase tracking-widest">
+                                    {% if request.user.is_superuser or request.user.is_staff %}Administrador{% else %}Secretaria{% endif %}
+                                </p>
+                            </div>
 
-        <header class="relative mb-12">
-            <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div>
-                    <span
-                        class="text-primary font-black uppercase tracking-[0.3em] text-[10px] bg-primary/10 px-4 py-2 rounded-full mb-4 inline-block">Management
-                        Console</span>
-                    <h1 class="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4">
-                        Panel <span
-                            class="text-primary underline decoration-slate-200 underline-offset-8">Administrativo</span>
-                    </h1>
-                    <p class="text-slate-500 mt-4 max-w-2xl text-lg font-medium">
-                        Bienvenido, <span class="text-slate-900 font-bold">{{ user.username }}</span>. Central de
-                        control para operaciones, destinos y logÃ­stica de TortugaTur.
-                    </p>
-                </div>
+                            <nav class="space-y-2 text-sm">
+                                <a href="{% url 'panel_admin' %}" class="dash-link active"><span class="material-icons text-[18px]">dashboard</span>Dashboard</a>
+                                {% if request.user.is_superuser or request.user.is_staff %}
+                                <a href="{% url 'destinos' %}" data-panel-url="{% url 'destinos' %}" class="dash-link"><span class="material-icons text-[18px]">place</span>Destinos</a>
+                                <a href="{% url 'admin_tours' %}" data-panel-url="{% url 'admin_tours' %}" class="dash-link"><span class="material-icons text-[18px]">map</span>Tours</a>
+                                {% endif %}
+                                <a href="{% url 'admin_salidas' %}" data-panel-url="{% url 'admin_salidas' %}" class="dash-link"><span class="material-icons text-[18px]">event_note</span>Salidas</a>
+                                {% if request.user.is_superuser or request.user.is_staff %}
+                                <a href="{% url 'admin_reservas' %}" data-panel-url="{% url 'admin_reservas' %}" class="dash-link"><span class="material-icons text-[18px]">event_available</span>Reservas</a>
+                                <a href="{% url 'admin_agencias' %}" data-panel-url="{% url 'admin_agencias' %}" class="dash-link"><span class="material-icons text-[18px]">apartment</span>Agencias</a>
+                                <a href="{% url 'admin_secretarias' %}" data-panel-url="{% url 'admin_secretarias' %}" class="dash-link"><span class="material-icons text-[18px]">groups</span>Secretarias</a>
+                                <a href="{% url 'empresa_config' %}" data-panel-url="{% url 'empresa_config' %}" class="dash-link"><span class="material-icons text-[18px]">badge</span>Empresa</a>
+                                <a href="{% url 'panel_galeria' %}" data-panel-url="{% url 'panel_galeria' %}" class="dash-link"><span class="material-icons text-[18px]">photo_library</span>Galeria</a>
+                                {% endif %}
+                                <a href="{% url 'secretaria_reservar' %}" data-panel-url="{% url 'secretaria_reservar' %}" class="dash-link"><span class="material-icons text-[18px]">support_agent</span>Reserva Asistida</a>
+                                <a href="{% url 'panel_actividad' %}" data-panel-url="{% url 'panel_actividad' %}" class="dash-link"><span class="material-icons text-[18px]">history</span>Actividad</a>
+                            </nav>
 
-                <div class="hidden lg:flex items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-100"
-                    aria-label="Estado del sistema">
-                    <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
-                        <span class="material-icons" aria-hidden="true">check_circle</span>
+                        </div>
                     </div>
-                    <div class="pr-4">
-                        <p class="text-[10px] uppercase font-black text-slate-400">Estado del Sistema</p>
-                        <p class="text-sm font-bold text-slate-800">Operacional</p>
-                    </div>
-                </div>
-            </div>
-        </header>
+                </aside>
 
-        <nav class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8" aria-label="Funciones principales">
-
-            {% if request.user.is_superuser or request.user.is_staff %}
-            <a href="{% url 'destinos' %}"
-                class="group relative bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2 overflow-hidden"
-                aria-label="Administrar rutas y destinos">
-                <div
-                    class="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-bl-[5rem] transition-transform group-hover:scale-110">
-                </div>
-                <div class="relative z-10">
-                    <div class="w-16 h-16 bg-slate-50 rounded-2xl text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-all duration-500 shadow-inner"
-                        aria-hidden="true">
-                        <span class="material-icons text-3xl">map</span>
-                    </div>
-                    <div class="mt-8">
-                        <h3 class="text-2xl font-black text-slate-900 group-hover:text-purple-600 transition-colors">
-                            Destinos</h3>
-                        <p class="mt-3 text-slate-500 leading-relaxed font-medium">
-                            Gestiona las islas y puntos de visita. Optimiza la informaciÃ³n geogrÃ¡fica de GalÃ¡pagos.
-                        </p>
-                    </div>
-                    <div
-                        class="mt-8 flex items-center gap-2 text-slate-900 font-black text-xs uppercase tracking-widest border-t border-slate-50 pt-6">
-                        Editar Mapas <span class="material-icons text-sm group-hover:translate-x-2 transition-transform"
-                            aria-hidden="true">arrow_forward</span>
-                    </div>
-                </div>
-            </a>
-
-            <a href="{% url 'admin_tours' %}"
-                class="group relative bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2 overflow-hidden"
-                aria-label="Gestionar catÃ¡logo de tours">
-                <div
-                    class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-[5rem] transition-transform group-hover:scale-110">
-                </div>
-                <div class="relative z-10">
-                    <div class="w-16 h-16 bg-slate-50 rounded-2xl text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all duration-500 shadow-inner"
-                        aria-hidden="true">
-                        <span class="material-icons text-3xl">beach_access</span>
-                    </div>
-                    <div class="mt-8">
-                        <h3 class="text-2xl font-black text-slate-900 group-hover:text-primary transition-colors">
-                            CatÃ¡logo de Tours</h3>
-                        <p class="mt-3 text-slate-500 leading-relaxed font-medium">
-                            DiseÃ±a experiencias Ãºnicas. Edita itinerarios, galerÃ­as de fotos y precios por temporada.
-                        </p>
-                    </div>
-                    <div
-                        class="mt-8 flex items-center gap-2 text-slate-900 font-black text-xs uppercase tracking-widest border-t border-slate-50 pt-6">
-                        Configurar Experiencias <span
-                            class="material-icons text-sm group-hover:translate-x-2 transition-transform"
-                            aria-hidden="true">arrow_forward</span>
-                    </div>
-                </div>
-            </a>
-            {% endif %}
-
-            <a href="{% url 'admin_salidas' %}"
-                class="group relative bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2 overflow-hidden"
-                aria-label="Gestionar disponibilidad y cupos">
-                <div
-                    class="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-bl-[5rem] transition-transform group-hover:scale-110">
-                </div>
-                <div class="relative z-10">
-                    <div class="w-16 h-16 bg-slate-50 rounded-2xl text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all duration-500 shadow-inner"
-                        aria-hidden="true">
-                        <span class="material-icons text-3xl">calendar_today</span>
-                    </div>
-                    <div class="mt-8">
-                        <h3 class="text-2xl font-black text-slate-900 group-hover:text-emerald-600 transition-colors">
-                            Disponibilidad</h3>
-                        <p class="mt-3 text-slate-500 leading-relaxed font-medium">
-                            Control de inventario. Ajusta cupos mÃ¡ximos por fecha y bloquea dÃ­as feriados.
-                        </p>
-                    </div>
-                    <div
-                        class="mt-8 flex items-center gap-2 text-slate-900 font-black text-xs uppercase tracking-widest border-t border-slate-50 pt-6">
-                        Abrir Frecuencias <span
-                            class="material-icons text-sm group-hover:translate-x-2 transition-transform"
-                            aria-hidden="true">arrow_forward</span>
-                    </div>
-                </div>
-            </a>
-
-            {% if request.user.is_superuser or request.user.is_staff %}
-            <a href="{% url 'admin_reservas' %}"
-                class="group relative bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2 overflow-hidden"
-                aria-label="Gestionar reservas y ventas">
-                <div
-                    class="absolute top-0 right-0 w-32 h-32 bg-secondary/5 rounded-bl-[5rem] transition-transform group-hover:scale-110">
-                </div>
-                <div class="relative z-10">
-                    <div class="w-16 h-16 bg-slate-50 rounded-2xl text-secondary flex items-center justify-center group-hover:bg-secondary group-hover:text-white transition-all duration-500 shadow-inner"
-                        aria-hidden="true">
-                        <span class="material-icons text-3xl">assignment</span>
-                    </div>
-                    <div class="mt-8">
-                        <h3 class="text-2xl font-black text-slate-900 group-hover:text-secondary transition-colors">
-                            Flujo de Ventas</h3>
-                        <p class="mt-3 text-slate-500 leading-relaxed font-medium">
-                            Monitorea transacciones, aprueba pagos pendientes y gestiona el check-in de viajeros.
-                        </p>
-                    </div>
-                    <div
-                        class="mt-8 flex items-center gap-2 text-slate-900 font-black text-xs uppercase tracking-widest border-t border-slate-50 pt-6">
-                        Revisar Historial <span
-                            class="material-icons text-sm group-hover:translate-x-2 transition-transform"
-                            aria-hidden="true">arrow_forward</span>
-                    </div>
-                </div>
-            </a>
-            {% endif %}
-
-            <a href="{% url 'secretaria_reservar' %}"
-                class="group relative bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2 overflow-hidden"
-                aria-label="Crear reserva para cliente por secretaria">
-                <div
-                    class="absolute top-0 right-0 w-32 h-32 bg-pink-500/5 rounded-bl-[5rem] transition-transform group-hover:scale-110">
-                </div>
-                <div class="relative z-10">
-                    <div class="w-16 h-16 bg-slate-50 rounded-2xl text-pink-600 flex items-center justify-center group-hover:bg-pink-600 group-hover:text-white transition-all duration-500 shadow-inner"
-                        aria-hidden="true">
-                        <span class="material-icons text-3xl">support_agent</span>
-                    </div>
-                    <div class="mt-8">
-                        <h3 class="text-2xl font-black text-slate-900 group-hover:text-pink-600 transition-colors">
-                            Reserva Asistida</h3>
-                        <p class="mt-3 text-slate-500 leading-relaxed font-medium">
-                            La secretaria busca tours por fecha, registra los datos del cliente y crea la reserva en
-                            nombre del pasajero.
-                        </p>
-                    </div>
-                    <div
-                        class="mt-8 flex items-center gap-2 text-slate-900 font-black text-xs uppercase tracking-widest border-t border-slate-50 pt-6">
-                        Crear Reserva <span
-                            class="material-icons text-sm group-hover:translate-x-2 transition-transform"
-                            aria-hidden="true">arrow_forward</span>
-                    </div>
-                </div>
-            </a>
-
-            {% if request.user.is_superuser or request.user.is_staff %}
-            <a href="{% url 'admin_secretarias' %}"
-                class="group relative bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2 overflow-hidden"
-                aria-label="Gestionar usuarios de secretaria">
-                <div
-                    class="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-bl-[5rem] transition-transform group-hover:scale-110">
-                </div>
-                <div class="relative z-10">
-                    <div class="w-16 h-16 bg-slate-50 rounded-2xl text-amber-600 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-all duration-500 shadow-inner"
-                        aria-hidden="true">
-                        <span class="material-icons text-3xl">manage_accounts</span>
-                    </div>
-                    <div class="mt-8">
-                        <h3 class="text-2xl font-black text-slate-900 group-hover:text-amber-600 transition-colors">
-                            Usuarios Secretaria</h3>
-                        <p class="mt-3 text-slate-500 leading-relaxed font-medium">
-                            Crea credenciales de acceso para secretarias con permiso exclusivo para reservas asistidas.
-                        </p>
-                    </div>
-                    <div
-                        class="mt-8 flex items-center gap-2 text-slate-900 font-black text-xs uppercase tracking-widest border-t border-slate-50 pt-6">
-                        Gestionar Cuentas <span
-                            class="material-icons text-sm group-hover:translate-x-2 transition-transform"
-                            aria-hidden="true">arrow_forward</span>
-                    </div>
-                </div>
-            </a>
-
-            <a href="{% url 'empresa_config' %}"
-                class="group relative bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2 overflow-hidden"
-                aria-label="Configurar datos fiscales de la empresa">
-                <div
-                    class="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-bl-[5rem] transition-transform group-hover:scale-110">
-                </div>
-                <div class="relative z-10">
-                    <div class="w-16 h-16 bg-slate-50 rounded-2xl text-cyan-600 flex items-center justify-center group-hover:bg-cyan-600 group-hover:text-white transition-all duration-500 shadow-inner"
-                        aria-hidden="true">
-                        <span class="material-icons text-3xl">business</span>
-                    </div>
-                    <div class="mt-8">
-                        <h3 class="text-2xl font-black text-slate-900 group-hover:text-cyan-600 transition-colors">
-                            Datos de Empresa</h3>
-                        <p class="mt-3 text-slate-500 leading-relaxed font-medium">
-                            Configura nombre comercial, RUC y datos que apareceran en tickets y comprobantes.
-                        </p>
-                    </div>
-                    <div
-                        class="mt-8 flex items-center gap-2 text-slate-900 font-black text-xs uppercase tracking-widest border-t border-slate-50 pt-6">
-                        Editar Datos <span
-                            class="material-icons text-sm group-hover:translate-x-2 transition-transform"
-                            aria-hidden="true">arrow_forward</span>
-                    </div>
-                </div>
-            </a>
-
-            <a href="{% url 'admin_agencias' %}"
-                class="group relative bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2 overflow-hidden"
-                aria-label="Administrar permisos de Agencias">
-                <div
-                    class="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-bl-[5rem] transition-transform group-hover:scale-110">
-                </div>
-                <div class="relative z-10">
-                    <div class="w-16 h-16 bg-slate-50 rounded-2xl text-amber-600 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-all duration-500 shadow-inner"
-                        aria-hidden="true">
-                        <span class="material-icons text-3xl">storefront</span>
-                    </div>
-                    <div class="mt-8">
-                        <h3 class="text-2xl font-black text-slate-900 group-hover:text-amber-600 transition-colors">
-                            Agencias Asociadas</h3>
-                        <p class="mt-3 text-slate-500 leading-relaxed font-medium">
-                            Concede o retira permisos a usuarios para bloquear reservas con penalidad de 15 dias.
-                        </p>
-                    </div>
-                    <div
-                        class="mt-8 flex items-center gap-2 text-slate-900 font-black text-xs uppercase tracking-widest border-t border-slate-50 pt-6">
-                        Gestionar Permisos <span
-                            class="material-icons text-sm group-hover:translate-x-2 transition-transform"
-                            aria-hidden="true">arrow_forward</span>
-                    </div>
-                </div>
-            </a>
-
-            <a href="{% url 'panel_galeria' %}"
-                class="group relative bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2 overflow-hidden"
-                aria-label="Gestionar fotos de la galerÃ­a">
-                <div
-                    class="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-bl-[5rem] transition-transform group-hover:scale-110">
-                </div>
-                <div class="relative z-10">
-                    <div class="w-16 h-16 bg-slate-50 rounded-2xl text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all duration-500 shadow-inner"
-                        aria-hidden="true">
-                        <span class="material-icons text-3xl">photo_library</span>
-                    </div>
-                    <div class="mt-8">
-                        <h3 class="text-2xl font-black text-slate-900 group-hover:text-blue-600 transition-colors">
-                            GalerÃ­a de Fotos</h3>
-                        <p class="mt-3 text-slate-500 leading-relaxed font-medium">
-                            Sube imÃ¡genes locales o agrega URLs de Google Drive para enriquecer los tours y reseÃ±as
-                            visuales.
-                        </p>
-                    </div>
-                    <div
-                        class="mt-8 flex items-center gap-2 text-slate-900 font-black text-xs uppercase tracking-widest border-t border-slate-50 pt-6">
-                        Administrar GalerÃ­a <span
-                            class="material-icons text-sm group-hover:translate-x-2 transition-transform"
-                            aria-hidden="true">arrow_forward</span>
-                    </div>
-                </div>
-            </a>
-            {% endif %}
-
-        </nav>
-
-        {% if request.user.is_superuser or request.user.is_staff %}
-        <section class="mt-16 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden"
-            aria-label="Actividad de Secretarias">
-            <h2 class="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3">
-                <span class="material-icons text-primary">history</span> Actividad Reciente de SecretarÃ­as
-            </h2>
-
-            <div class="flex items-end gap-3 mb-6">
-                <form method="get" class="flex items-end gap-2">
-                    <div>
-                        <label class="block text-[10px] uppercase tracking-widest text-slate-400 font-black mb-1">Fecha de actividad</label>
-                        <input type="date" name="actividad_fecha" value="{{ actividad_fecha|date:'Y-m-d' }}"
-                            class="px-3 py-2 border border-slate-200 rounded-xl bg-white text-slate-700 font-semibold text-sm">
-                    </div>
-                    <button type="submit"
-                        class="h-10 px-4 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest hover:bg-primary transition">
-                        Ver dia
-                    </button>
-                </form>
-                <a href="{% url 'descargar_actividad_dia_pdf' %}?actividad_fecha={{ actividad_fecha|date:'Y-m-d' }}"
-                    class="h-10 px-4 inline-flex items-center rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-black uppercase tracking-widest hover:border-primary hover:text-primary transition">
-                    Descargar PDF
-                </a>
-            </div>
-
-            <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">
-                Actividades del {{ actividad_fecha|date:"d/m/Y" }}
-            </h3>
-            {% if agenda_secretarias_dia %}
-            <div class="overflow-x-auto border border-slate-100 rounded-2xl mb-8">
-                <table class="w-full text-sm">
-                    <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] tracking-widest">
-                        <tr>
-                            <th class="px-4 py-3 text-left">Tipo</th>
-                            <th class="px-4 py-3 text-left">Referencia</th>
-                            <th class="px-4 py-3 text-left">Detalle</th>
-                            <th class="px-4 py-3 text-left">Estado</th>
-                            <th class="px-4 py-3 text-left">Hora</th>
-                            <th class="px-4 py-3 text-right">Monto</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in agenda_secretarias_dia %}
-                        <tr class="border-t border-slate-100">
-                            <td class="px-4 py-3 text-xs font-black uppercase text-slate-500">{{ item.tipo }}</td>
-                            <td class="px-4 py-3 font-bold text-slate-700">#{{ item.id|stringformat:"05d" }}</td>
-                            <td class="px-4 py-3 text-slate-700">{{ item.titulo }} | {{ item.tour }}</td>
-                            <td class="px-4 py-3 text-slate-600 uppercase text-xs font-bold">{{ item.estado }}</td>
-                            <td class="px-4 py-3 text-slate-600">{{ item.dt|date:"h:i A" }}</td>
-                            <td class="px-4 py-3 text-right font-black text-slate-900">
-                                {% if item.monto %}${{ item.monto }}{% else %}-{% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <p class="text-sm text-slate-400 italic mb-8">No hay actividades de secretarias en esa fecha.</p>
-            {% endif %}
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <!-- Columna Reservas -->
-                <div>
-                    <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Ãšltimas Reservas
-                        (Ventas)</h3>
-                    {% if actividad_reservas %}
-                    <ul class="space-y-4">
-                        {% for res in actividad_reservas %}
-                        <li
-                            class="bg-slate-50 p-4 rounded-xl border border-slate-100 flex justify-between items-center group hover:bg-white transition-all">
+                <section class="dash-content p-5 sm:p-6 lg:p-8">
+                    <div class="dash-topbar mb-4">
+                        <div class="dash-topbar-left">
+                            <span class="dash-brand-mark"></span>
                             <div>
-                                <p class="text-sm font-bold text-slate-800">
-                                    <span class="text-xs mr-2 text-slate-400">#{{ res.id|stringformat:"05d" }}</span>
-                                    {{ res.nombre }} {{ res.apellidos }}
-                                </p>
-                                <p class="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                                    <span class="material-icons text-[14px]">map</span> {{ res.salida.tour.nombre }}
-                                </p>
+                                <p class="dash-eyebrow">TortugaTur Panel</p>
+                                <p class="dash-eyebrow-sub">Centro de control operativo</p>
                             </div>
-                            <div class="text-right">
-                                <p class="text-sm font-black text-slate-900">${{ res.total_pagar }}</p>
-                                <p class="text-[10px] uppercase font-bold text-primary mt-1">{{ res.creado_por.username }}</p>
+                        </div>
+                        <div class="dash-topbar-right">
+                            <button id="dashThemeToggle" type="button" class="dash-topbar-pill" aria-label="Alternar modo oscuro">
+                                <span class="material-icons text-[16px]" id="dashThemeIcon">dark_mode</span>
+                                <span id="dashThemeLabel">Oscuro</span>
+                            </button>
+                            <div class="dash-profile-menu" id="dashProfileMenu">
+                                <button type="button" class="dash-topbar-pill dash-profile-trigger" id="dashProfileMenuBtn" aria-haspopup="true" aria-expanded="false">
+                                    {% if panel_profile_url %}
+                                    <img src="{{ panel_profile_url }}" alt="Perfil" class="w-7 h-7 rounded-full object-cover">
+                                    {% else %}
+                                    <span class="material-icons text-[18px]">account_circle</span>
+                                    {% endif %}
+                                    <span>{{ user.username }}</span>
+                                    <span class="material-icons text-[16px]">expand_more</span>
+                                </button>
+                                <div class="dash-profile-dropdown hidden" id="dashProfileDropdown">
+                                    <a href="{% url 'perfil_admin' %}" data-panel-url="{% url 'perfil_admin' %}" class="dash-profile-link">
+                                        <span class="material-icons text-[16px]">person</span>Mi perfil
+                                    </a>
+                                    <form action="{% url 'logout' %}" method="post">
+                                        {% csrf_token %}
+                                        <button type="submit" class="dash-profile-logout">
+                                            <span class="material-icons text-[16px]">logout</span>Cerrar sesion
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                    {% else %}
-                    <p class="text-sm text-slate-400 italic">No hay reservas recientes hechas por secretarias.</p>
-                    {% endif %}
-                </div>
-
-                <!-- Columna Salidas -->
-                <div>
-                    <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Ãšltimas Disponibilidades
-                    </h3>
-                    {% if actividad_salidas %}
-                    <ul class="space-y-4">
-                        {% for sal in actividad_salidas %}
-                        <li
-                            class="bg-slate-50 p-4 rounded-xl border border-slate-100 flex justify-between items-center group hover:bg-white transition-all">
-                            <div>
-                                <p class="text-sm font-bold text-slate-800">
-                                    <span class="text-xs mr-2 text-slate-400">#{{ sal.id|stringformat:"05d" }}</span>
-                                    {{ sal.tour.nombre }}
-                                </p>
-                                <p class="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                                    <span class="material-icons text-[14px]">calendar_today</span> {{ sal.fecha|date:"d M Y" }}
-                                </p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-sm font-black text-slate-900">{{ sal.cupos_disponibles }} cupos</p>
-                                <p class="text-[10px] uppercase font-bold text-primary mt-1">{{ sal.creado_por.username }}</p>
-                            </div>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                    {% else %}
-                    <p class="text-sm text-slate-400 italic">No hay frecuencias recientes hechas por secretarias.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </section>
-        {% endif %}
-
-        {% if es_secretaria_panel %}
-        <section class="mt-16 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden"
-            aria-label="Resumen de Secretaria">
-            <h2 class="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3">
-                <span class="material-icons text-primary">point_of_sale</span> Modulo de Ventas y Gestion
-            </h2>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <div class="bg-slate-50 border border-slate-100 rounded-2xl p-5">
-                    <p class="text-[10px] uppercase tracking-widest text-slate-400 font-black">Reservas</p>
-                    <p class="text-3xl font-black text-slate-900 mt-1">{{ resumen_secretaria.total_reservas|default:0 }}</p>
-                </div>
-                <div class="bg-slate-50 border border-slate-100 rounded-2xl p-5">
-                    <p class="text-[10px] uppercase tracking-widest text-slate-400 font-black">Ingresos</p>
-                    <p class="text-3xl font-black text-emerald-600 mt-1">${{ resumen_secretaria.total_ventas|default:"0.00" }}</p>
-                </div>
-                <div class="bg-slate-50 border border-slate-100 rounded-2xl p-5">
-                    <p class="text-[10px] uppercase tracking-widest text-slate-400 font-black">Efectivo</p>
-                    <p class="text-3xl font-black text-slate-900 mt-1">${{ resumen_secretaria.total_efectivo|default:"0.00" }}</p>
-                </div>
-            </div>
-
-            <div class="flex flex-wrap gap-3 mb-6">
-                <a href="{% url 'secretaria_reservar' %}" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white font-black text-xs uppercase tracking-widest hover:bg-primary-dark transition">
-                    <span class="material-icons text-sm">point_of_sale</span> Ventas / Reserva Asistida
-                </a>
-                <a href="{% url 'admin_salidas' %}" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white font-black text-xs uppercase tracking-widest hover:bg-slate-700 transition">
-                    <span class="material-icons text-sm">calendar_today</span> Gestion de Disponibilidad
-                </a>
-            </div>
-
-            <div class="flex items-end gap-3 mt-2 mb-5">
-                <form method="get" class="flex items-end gap-2">
-                    <div>
-                        <label class="block text-[10px] uppercase tracking-widest text-slate-400 font-black mb-1">Fecha de actividad</label>
-                        <input type="date" name="actividad_fecha" value="{{ actividad_fecha|date:'Y-m-d' }}"
-                            class="px-3 py-2 border border-slate-200 rounded-xl bg-white text-slate-700 font-semibold text-sm">
+                        </div>
                     </div>
-                    <button type="submit"
-                        class="h-10 px-4 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest hover:bg-primary transition">
-                        Ver dia
-                    </button>
-                </form>
-                <a href="{% url 'descargar_actividad_dia_pdf' %}?actividad_fecha={{ actividad_fecha|date:'Y-m-d' }}"
-                    class="h-10 px-4 inline-flex items-center rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-black uppercase tracking-widest hover:border-primary hover:text-primary transition">
-                    Descargar PDF
-                </a>
-            </div>
+                    <div id="panelEmbeddedView" class="hidden">
+                        <iframe id="panelEmbeddedFrame" class="panel-iframe" src="about:blank" title="Panel Interno" scrolling="no"></iframe>
+                    </div>
+                    <div id="panelDashboardView">
+                    <header class="mb-6">
+                        <div class="dash-main-head flex flex-col md:flex-row md:items-center justify-between gap-3">
+                            <div>
+                                <p class="dash-main-kicker">Operacion en vivo</p>
+                                <h1 class="dash-main-title">Dashboard Operativo</h1>
+                                <p class="dash-main-subtitle">Monitorea ingresos, inventario y actividad del equipo en una sola vista.</p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2 dash-header-actions">
+                                <a href="{% url 'panel_actividad' %}" class="dash-head-btn dash-head-btn-primary">Actividad Completa</a>
+                                <a href="{% url 'descargar_actividad_dia_pdf' %}?actividad_fecha={{ actividad_fecha|date:'Y-m-d' }}" class="dash-head-btn dash-head-btn-secondary">Exportar PDF</a>
+                            </div>
+                        </div>
+                    </header>
 
-            <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">
-                Actividades del {{ actividad_fecha|date:"d/m/Y" }}
-            </h3>
-            {% if agenda_secretaria_dia %}
-            <div class="overflow-x-auto border border-slate-100 rounded-2xl">
-                <table class="w-full text-sm">
-                    <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] tracking-widest">
-                        <tr>
-                            <th class="px-4 py-3 text-left">Tipo</th>
-                            <th class="px-4 py-3 text-left">Referencia</th>
-                            <th class="px-4 py-3 text-left">Detalle</th>
-                            <th class="px-4 py-3 text-left">Estado</th>
-                            <th class="px-4 py-3 text-left">Hora</th>
-                            <th class="px-4 py-3 text-right">Monto</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in agenda_secretaria_dia %}
-                        <tr class="border-t border-slate-100">
-                            <td class="px-4 py-3 text-xs font-black uppercase text-slate-500">{{ item.tipo }}</td>
-                            <td class="px-4 py-3 font-bold text-slate-700">#{{ item.id|stringformat:"05d" }}</td>
-                            <td class="px-4 py-3 text-slate-700">{{ item.titulo }} | {{ item.tour }}</td>
-                            <td class="px-4 py-3 text-slate-600 uppercase text-xs font-bold">{{ item.estado }}</td>
-                            <td class="px-4 py-3 text-slate-600">{{ item.dt|date:"h:i A" }}</td>
-                            <td class="px-4 py-3 text-right font-black text-slate-900">
-                                {% if item.monto %}${{ item.monto }}{% else %}-{% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <p class="text-sm text-slate-400 italic">No hay actividades en esa fecha.</p>
-            {% endif %}
-        </section>
-        {% endif %}
+                    <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
+                        <article class="dash-kpi dash-kpi-reservas dash-kpi-major">
+                            <div class="dash-kpi-head">
+                                <p class="dash-kpi-label">Reservas Hoy</p>
+                                <span class="material-icons dash-kpi-icon">event_available</span>
+                            </div>
+                            <p class="dash-kpi-value">{{ kpi_panel.reservas_hoy|default:0 }}</p>
+                        </article>
+                        <article class="dash-kpi dash-kpi-ingresos dash-kpi-major">
+                            <div class="dash-kpi-head">
+                                <p class="dash-kpi-label">Ingresos Hoy</p>
+                                <span class="material-icons dash-kpi-icon">payments</span>
+                            </div>
+                            <p class="dash-kpi-value text-emerald-600">${{ kpi_panel.ingresos_hoy|default:"0.00" }}</p>
+                        </article>
+                        <article class="dash-kpi dash-kpi-bloqueos dash-kpi-major">
+                            <div class="dash-kpi-head">
+                                <p class="dash-kpi-label">Bloqueos</p>
+                                <span class="material-icons dash-kpi-icon">lock_clock</span>
+                            </div>
+                            <p class="dash-kpi-value text-blue-600">{{ kpi_panel.bloqueos_hoy|default:0 }}</p>
+                        </article>
+                        <article class="dash-kpi dash-kpi-penalizaciones">
+                            <div class="dash-kpi-head">
+                                <p class="dash-kpi-label">Penalizaciones</p>
+                                <span class="material-icons dash-kpi-icon">gavel</span>
+                            </div>
+                            <p class="dash-kpi-value text-amber-600">{{ kpi_panel.penalizaciones_hoy|default:0 }}</p>
+                        </article>
+                    </section>
 
-        <footer class="mt-16 bg-slate-900 rounded-[3rem] p-8 md:p-12 text-center relative overflow-hidden"
-            role="contentinfo">
-            <div class="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-                <div class="absolute top-[-10%] left-[-10%] w-64 h-64 bg-primary rounded-full blur-[100px]"></div>
+                    {% if request.user.is_superuser or request.user.is_staff %}
+                    <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
+                        <article class="dash-kpi dash-kpi-ingresos">
+                            <div class="dash-kpi-head">
+                                <p class="dash-kpi-label">Dinero Total</p>
+                                <span class="material-icons dash-kpi-icon">account_balance_wallet</span>
+                            </div>
+                            <p class="dash-kpi-value text-emerald-600">${{ resumen_financiero.ingresos_total|default:"0.00"|floatformat:2 }}</p>
+                        </article>
+                        <article class="dash-kpi dash-kpi-ingresos dash-kpi-major">
+                            <div class="dash-kpi-head">
+                                <p class="dash-kpi-label">Ingresos Mes</p>
+                                <span class="material-icons dash-kpi-icon">calendar_month</span>
+                            </div>
+                            <p class="dash-kpi-value text-emerald-600">${{ resumen_financiero.ingresos_mes|default:"0.00"|floatformat:2 }}</p>
+                        </article>
+                        <article class="dash-kpi dash-kpi-reservas">
+                            <div class="dash-kpi-head">
+                                <p class="dash-kpi-label">Inventario Mes</p>
+                                <span class="material-icons dash-kpi-icon">inventory_2</span>
+                            </div>
+                            <p class="text-sm font-black text-slate-900 mt-2">{{ resumen_financiero.reservas_mes|default:0 }} reservas</p>
+                            <p class="text-xs font-bold text-slate-500">{{ resumen_financiero.pasajeros_mes|default:0 }} pasajeros</p>
+                        </article>
+                        <article class="dash-kpi dash-kpi-reservas">
+                            <div class="dash-kpi-head">
+                                <p class="dash-kpi-label">Inventario Año</p>
+                                <span class="material-icons dash-kpi-icon">query_stats</span>
+                            </div>
+                            <p class="text-sm font-black text-slate-900 mt-2">{{ resumen_financiero.reservas_anio|default:0 }} reservas</p>
+                            <p class="text-xs font-bold text-slate-500">{{ resumen_financiero.pasajeros_anio|default:0 }} pasajeros</p>
+                        </article>
+                    </section>
+
+                    <section class="grid xl:grid-cols-2 gap-4 mb-6">
+                        <article class="dash-card">
+                            <div class="dash-card-head">
+                                <h3 class="dash-card-title"><span class="material-icons text-base">notifications_active</span>Recordatorios de Agencia</h3>
+                            </div>
+                            {% if recordatorios_agencia %}
+                            <div class="overflow-auto max-h-[260px] rounded-lg border border-slate-100">
+                                <table class="w-full text-sm">
+                                    <thead class="text-slate-600 uppercase tracking-widest text-[11px]">
+                                        <tr>
+                                            <th class="text-left py-2">Ref</th>
+                                            <th class="text-left py-2">Tour</th>
+                                            <th class="text-left py-2">Fecha</th>
+                                            <th class="text-left py-2">Vence</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for r in recordatorios_agencia %}
+                                        <tr class="border-t border-slate-100">
+                                            <td class="py-2 font-bold text-slate-800">#{{ r.id|stringformat:"05d" }}</td>
+                                            <td class="py-2 text-slate-700">{{ r.salida.tour.nombre }}</td>
+                                            <td class="py-2 text-slate-700">{{ r.salida.fecha|date:"d/m/Y" }} {{ r.hora_turno_agencia|time:"h:i A" }}</td>
+                                            <td class="py-2 {% if r.esta_vencida %}text-red-600{% else %}text-slate-600{% endif %}">
+                                                {{ r.limite_pago_agencia|date:"d/m/Y h:i A" }}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="dash-empty-state">
+                                <span class="material-icons">task_alt</span>
+                                <p class="dash-empty-title">Todo al dia</p>
+                                <p class="dash-empty-copy">No hay recordatorios pendientes de agencia para este rango.</p>
+                            </div>
+                            {% endif %}
+                        </article>
+
+                        <div id="actividadSecretariasPanelWrap">
+                            {% include "core/panel/_actividad_secretarias_panel.html" %}
+                        </div>
+                    </section>
+
+                    <section class="grid xl:grid-cols-2 gap-4">
+                        <article class="dash-card">
+                            <div class="dash-card-head"><h3 class="dash-card-title"><span class="material-icons text-base">receipt_long</span>Ultimas Reservas</h3></div>
+                            {% if actividad_reservas %}
+                            <div class="overflow-auto max-h-[290px] rounded-lg border border-slate-100">
+                                <table class="w-full text-sm dash-compact-table">
+                                    <thead class="text-slate-600 uppercase tracking-widest text-[11px]">
+                                        <tr>
+                                            <th class="text-left py-2 px-2">Reserva</th>
+                                            <th class="text-left py-2 px-2">Tour</th>
+                                            <th class="text-left py-2 px-2">Monto</th>
+                                            <th class="text-left py-2 px-2">Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for res in actividad_reservas %}
+                                        {% with estado=res.estado_pago|default:res.estado|default:"pendiente" %}
+                                        {% with estado_l=estado|lower %}
+                                        <tr class="border-t border-slate-100">
+                                            <td class="py-2 px-2">
+                                                <p class="font-bold text-slate-800">#{{ res.id|stringformat:"05d" }}</p>
+                                                <p class="text-xs text-slate-500">{{ res.nombre }} {{ res.apellidos }}</p>
+                                            </td>
+                                            <td class="py-2 px-2 text-slate-700">{{ res.salida.tour.nombre }}</td>
+                                            <td class="py-2 px-2 font-bold text-slate-900">${{ res.total_pagar }}</td>
+                                            <td class="py-2 px-2">
+                                                <span class="dash-status-badge {% if 'cancel' in estado_l %}cancelado{% elif 'pag' in estado_l or 'confirm' in estado_l %}pagado{% else %}pendiente{% endif %}">
+                                                    {{ estado }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {% endwith %}
+                                        {% endwith %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="dash-empty-state">
+                                <span class="material-icons">inventory_2</span>
+                                <p class="dash-empty-title">Sin reservas nuevas</p>
+                                <p class="dash-empty-copy">Cuando ingresen nuevas reservas apareceran aqui con su estado de pago.</p>
+                            </div>
+                            {% endif %}
+                        </article>
+
+                        <article class="dash-card">
+                            <div class="dash-card-head"><h3 class="dash-card-title"><span class="material-icons text-base">event_note</span>Ultimas Disponibilidades</h3></div>
+                            {% if actividad_salidas %}
+                            <ul class="space-y-2">
+                                {% for sal in actividad_salidas %}
+                                <li class="dash-list-row">
+                                    <div>
+                                        <p class="font-bold text-slate-800">#{{ sal.id|stringformat:"05d" }} {{ sal.tour.nombre }}</p>
+                                        <p class="text-xs text-slate-500">{{ sal.fecha|date:"d M Y" }}</p>
+                                    </div>
+                                    <p class="font-black text-slate-900">{{ sal.cupos_disponibles }} cupos</p>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}
+                            <div class="dash-empty-state">
+                                <span class="material-icons">calendar_month</span>
+                                <p class="dash-empty-title">Agenda sin cambios recientes</p>
+                                <p class="dash-empty-copy">No hay movimientos de cupos. Revisa proximas salidas programadas.</p>
+                            </div>
+                            <div class="dash-mini-calendar">
+                                <div class="dash-mini-calendar-head">
+                                    <span>Proximos tours</span>
+                                    <span>{{ actividad_fecha|date:"M Y" }}</span>
+                                </div>
+                                <div class="dash-mini-calendar-grid">
+                                    <span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>
+                                    <span>1</span><span>2</span><span>3</span><span class="is-tour">4</span><span>5</span><span>6</span><span>7</span>
+                                    <span>8</span><span>9</span><span class="is-tour">10</span><span>11</span><span>12</span><span>13</span><span>14</span>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </article>
+                    </section>
+                    {% endif %}
+
+                    {% if es_secretaria_panel %}
+                    <section id="resumen-ventas" class="grid xl:grid-cols-2 gap-4">
+                        <article class="dash-card">
+                            <div class="dash-card-head"><h3 class="dash-card-title"><span class="material-icons text-base">insights</span>Resumen de Secretaria</h3></div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="bg-slate-50 rounded-xl p-3">
+                                    <p class="text-[10px] uppercase text-slate-400 font-black">Reservas</p>
+                                    <p class="text-2xl font-black text-slate-900">{{ resumen_secretaria.total_reservas|default:0 }}</p>
+                                </div>
+                                <div class="bg-slate-50 rounded-xl p-3">
+                                    <p class="text-[10px] uppercase text-slate-400 font-black">Ingresos</p>
+                                    <p class="text-2xl font-black text-emerald-600">${{ resumen_secretaria.total_ventas|default:"0.00" }}</p>
+                                </div>
+                                <div class="bg-slate-50 rounded-xl p-3 col-span-2">
+                                    <p class="text-[10px] uppercase text-slate-400 font-black">Efectivo</p>
+                                    <p class="text-2xl font-black text-slate-900">${{ resumen_secretaria.total_efectivo|default:"0.00" }}</p>
+                                </div>
+                            </div>
+                        </article>
+                        <article class="dash-card">
+                            <div class="dash-card-head"><h3 class="dash-card-title"><span class="material-icons text-base">history</span>Actividad del Dia</h3></div>
+                            {% if agenda_secretaria_dia %}
+                            <div class="overflow-auto max-h-[260px] rounded-lg border border-slate-100">
+                                <table class="w-full text-sm">
+                                    <thead class="text-slate-600 uppercase tracking-widest text-[11px]">
+                                        <tr>
+                                            <th class="text-left py-2">Tipo</th>
+                                            <th class="text-left py-2">Detalle</th>
+                                            <th class="text-left py-2">Hora</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in agenda_secretaria_dia %}
+                                        <tr class="border-t border-slate-100">
+                                            <td class="py-2 font-bold uppercase">{{ item.tipo }}</td>
+                                            <td class="py-2">#{{ item.id|stringformat:"05d" }} {{ item.tour }}</td>
+                                            <td class="py-2">{{ item.dt|date:"h:i A" }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-sm text-slate-400 italic">No hay actividad en esa fecha.</p>
+                            {% endif %}
+                        </article>
+                    </section>
+                    <section class="mt-4">
+                        <article class="dash-card">
+                            <div class="dash-card-head">
+                                <h3 class="dash-card-title"><span class="material-icons text-base">calendar_month</span>Historial de Ventas (30 dias)</h3>
+                            </div>
+                            {% if historial_secretaria_dias %}
+                            <div class="overflow-auto max-h-[320px] rounded-lg border border-slate-100">
+                                <table class="w-full text-sm">
+                                    <thead class="text-slate-600 uppercase tracking-widest text-[11px]">
+                                        <tr>
+                                            <th class="text-left py-2">Fecha</th>
+                                            <th class="text-left py-2">Reservas</th>
+                                            <th class="text-left py-2">Ingresos</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for h in historial_secretaria_dias %}
+                                        <tr class="border-t border-slate-100">
+                                            <td class="py-2 font-bold text-slate-800">{{ h.fecha|date:"d/m/Y" }}</td>
+                                            <td class="py-2 text-slate-700">{{ h.total_reservas }}</td>
+                                            <td class="py-2 text-emerald-700 font-bold">${{ h.total_ingresos|default:"0.00" }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-sm text-slate-400 italic">No hay ventas registradas en los ultimos 30 dias.</p>
+                            {% endif %}
+                        </article>
+                    </section>
+                    {% endif %}
+                    </div>
+                </section>
             </div>
-            <div class="relative z-10 max-w-2xl mx-auto">
-                <span class="material-icons text-primary text-4xl mb-4" aria-hidden="true">security</span>
-                <h4 class="text-white text-xl font-bold mb-4">Seguridad del Sistema</h4>
-                <p class="text-slate-400 text-sm leading-relaxed">
-                    EstÃ¡s en un Ã¡rea restringida. Todas las modificaciones quedan registradas en el log de auditorÃ­a.
-                    AsegÃºrate de cerrar sesiÃ³n al terminar tu jornada para proteger la integridad de los datos.
-                </p>
-                <div class="mt-8 flex justify-center gap-4">
-                    <form action="{% url 'logout' %}" method="post">
-                        {% csrf_token %}
-                        <button type="submit"
-                            class="bg-white/10 hover:bg-red-500 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
-                            aria-label="Cerrar sesiÃ³n">
-                            Finalizar SesiÃ³n
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </footer>
+        </div>
     </div>
 </main>
 
 <style>
-    /* Se mantienen tus estilos CSS originales */
-    body {
-        -webkit-font-smoothing: antialiased;
+    .dashboard-shell {
+        background: #ffffff;
     }
 
-    .shadow-inner {
-        box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+    .dash-layout {
+        min-height: 100vh;
     }
 
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
+    .dash-sidebar-shell {
+        position: fixed;
+        left: 0;
+        top: 0;
+        height: 100vh;
+        width: 280px;
+        min-width: 280px;
+        z-index: 45;
+    }
+
+    .dash-toggle-btn {
+        width: 42px;
+        height: 42px;
+        background: rgba(15, 23, 42, 0.45);
+        color: #f8fafc;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 0.55rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+
+    .dash-sidepanel {
+        width: 280px;
+        height: 100vh;
+        background: linear-gradient(180deg, #0f7a43 0%, #0b5d34 100%);
+        border-right: 1px solid rgba(255, 255, 255, 0.12);
+        overflow-x: hidden;
+        overflow-y: auto;
+        position: relative;
+        top: 0;
+        left: 0;
+        transform: translateX(0);
+        transition: transform 0.25s ease;
+        z-index: 45;
+        box-shadow: 10px 0 24px rgba(15, 23, 42, 0.16);
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .dash-sidepanel::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+    }
+
+    .dash-sidepanel-inner {
+        width: 280px;
+        padding: 1.5rem;
+        padding-bottom: 2.5rem;
+    }
+
+    .sidebar-expanded .dash-sidepanel {
+        transform: translateX(0);
+    }
+
+    .sidebar-collapsed .dash-sidebar-shell {
+        width: 64px;
+        min-width: 64px;
+    }
+
+    .sidebar-collapsed .dash-sidepanel {
+        width: 64px;
+    }
+
+    .sidebar-collapsed .dash-sidepanel-inner {
+        width: 64px;
+        padding: 1rem 0.55rem;
+    }
+
+    .sidebar-collapsed .dash-sidepanel-inner>*:not(.dash-toggle-wrap):not(.dash-mini-nav) {
+        display: none;
+    }
+
+    .dash-mini-nav {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.55rem;
+        margin-top: 0.4rem;
+    }
+
+    .sidebar-collapsed .dash-mini-nav {
+        display: flex;
+    }
+
+    .dash-mini-link {
+        width: 34px;
+        height: 34px;
+        border-radius: 0.5rem;
+        color: #dbeafe;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+
+    .dash-mini-link:hover,
+    .dash-mini-link.active {
+        background: rgba(255, 255, 255, 0.22);
+        color: #ffffff;
+    }
+
+    .dash-content {
+        background:
+            radial-gradient(900px 450px at -10% -15%, rgba(16, 185, 129, 0.09), transparent 60%),
+            radial-gradient(700px 360px at 110% 5%, rgba(59, 130, 246, 0.08), transparent 58%),
+            #f8fafc;
+        margin-left: 280px;
+        min-width: 0;
+        transition: margin-left 0.25s ease;
+    }
+
+    .sidebar-collapsed .dash-content {
+        margin-left: 64px;
+    }
+
+    .dash-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.35);
+        z-index: 40;
+    }
+
+    .dash-mobile-toggle {
+        display: none;
+        position: fixed;
+        left: 0.6rem;
+        top: 0.65rem;
+        z-index: 60;
+        width: 42px;
+        height: 42px;
+        border-radius: 0.55rem;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: #0f7a43;
+        color: #fff;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);
+    }
+
+    @media (min-width: 1024px) {
+        .dash-backdrop {
+            display: none !important;
         }
-
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
     }
 
-    nav>a {
-        animation: fadeInUp 0.6s ease-out forwards;
+
+    .dash-link {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.55rem 0.75rem;
+        border-radius: 0.75rem;
+        color: #cbd5e1;
+        font-weight: 700;
+        transition: all 0.2s ease;
     }
 
-    nav>a:nth-child(1) {
-        animation-delay: 0.1s;
+    .dash-link:hover {
+        background: rgba(19, 182, 236, 0.22);
+        color: #ffffff;
     }
 
-    nav>a:nth-child(2) {
-        animation-delay: 0.2s;
+    .dash-link.active {
+        background: rgba(19, 182, 236, 0.3);
+        color: #ffffff;
     }
 
-    nav>a:nth-child(3) {
-        animation-delay: 0.3s;
+    .dash-topbar {
+        background: #eef2f7;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        padding: 0.55rem 0.8rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.8rem;
+        position: sticky;
+        top: 0.5rem;
+        z-index: 20;
     }
 
-    nav>a:nth-child(4) {
-        animation-delay: 0.4s;
+    .dash-topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
     }
 
-    nav>a {
+    .dash-topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .dash-topbar-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #334155;
+        border-radius: 999px;
+        padding: 0.3rem 0.65rem;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .dash-topbar-pill-danger {
+        background: #dc2626;
+        color: #ffffff;
+        border-color: #dc2626;
+    }
+
+    .dash-topbar-pill-danger:hover {
+        background: #b91c1c;
+    }
+
+    .dash-main-head {
+        background: linear-gradient(135deg, #ffffff 0%, #f3f7fb 100%);
+        border: 1px solid #dbe5ef;
+        border-radius: 1rem;
+        padding: 0.9rem 1rem;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    .dash-head-btn {
+        padding: 0.55rem 0.9rem;
+        border-radius: 0.7rem;
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .dash-head-btn-primary {
+        background: linear-gradient(135deg, #0f172a 0%, #0b2447 100%);
+        color: #ffffff;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.2);
+    }
+
+    .dash-head-btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 20px rgba(15, 23, 42, 0.25);
+    }
+
+    .dash-head-btn-secondary {
+        background: #ffffff;
+        color: #334155;
+        border: 1px solid #cbd5e1;
+    }
+
+    .dash-head-btn-secondary:hover {
+        border-color: #0f7a43;
+        color: #0f7a43;
+    }
+
+    .panel-iframe {
+        width: 100%;
+        min-height: calc(100vh - 3rem);
+        border: 0;
+        border-radius: 0.75rem;
+        background: #f8fafc;
+    }
+
+    .dash-kpi {
+        background: #ffffff;
+        border: 1px solid #dbeafe;
+        border-radius: 1rem;
+        padding: 0.95rem;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .dash-kpi::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 3px;
+        background: linear-gradient(90deg, rgba(16, 185, 129, 0.9), rgba(59, 130, 246, 0.8));
+    }
+
+    .dash-kpi:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 16px 30px rgba(15, 23, 42, 0.11);
+    }
+
+    .dash-kpi-reservas {
+        background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+        border-color: #bfdbfe;
+    }
+
+    .dash-kpi-ingresos {
+        background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%);
+        border-color: #a7f3d0;
+    }
+
+    .dash-kpi-bloqueos {
+        background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+        border-color: #93c5fd;
+    }
+
+    .dash-kpi-penalizaciones {
+        background: linear-gradient(180deg, #fffbeb 0%, #ffffff 100%);
+        border-color: #fde68a;
+    }
+
+    .dash-kpi-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: #94a3b8;
+        font-weight: 900;
+    }
+
+    .dash-kpi-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.4rem;
+    }
+
+    .dash-kpi-icon {
+        font-size: 16px;
+        color: #334155;
+        background: #e2e8f0;
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .dash-kpi-value {
+        margin-top: 0.2rem;
+        font-size: 1.8rem;
+        line-height: 1;
+        color: #0f172a;
+        font-weight: 900;
+    }
+
+    .dash-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 1rem;
+        padding: 0.9rem;
+        box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .dash-card::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 3px;
+        background: linear-gradient(90deg, #0f7a43, #13b6ec);
+    }
+
+    .dash-card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.7rem;
+    }
+
+    .dash-card-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #334155;
+        font-weight: 900;
+        border-left: 4px solid #10b981;
+        padding-left: 0.5rem;
+    }
+
+    .dash-list-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        border-radius: 0.75rem;
+        padding: 0.6rem 0.7rem;
+    }
+
+    #dashRoot {
+        --dash-bg: #f8fafc;
+        --dash-surface: #ffffff;
+        --dash-surface-soft: #f1f5f9;
+        --dash-text: #0f172a;
+        --dash-muted: #64748b;
+        --dash-border: #dbe5ef;
+        --dash-brand: #0f7a43;
+        --dash-brand-strong: #07552d;
+    }
+
+    .dashboard-dark {
+        --dash-bg: #070f0c;
+        --dash-surface: #101a16;
+        --dash-surface-soft: #17231d;
+        --dash-text: #ecf8f1;
+        --dash-muted: #9cb3a7;
+        --dash-border: #243a31;
+        --dash-brand: #2ac176;
+        --dash-brand-strong: #168f52;
+        background: var(--dash-bg) !important;
+        color: var(--dash-text);
+    }
+
+    .dashboard-dark .dash-content {
+        background:
+            radial-gradient(920px 460px at -10% -10%, rgba(40, 190, 118, 0.18), transparent 60%),
+            radial-gradient(760px 390px at 110% 5%, rgba(27, 115, 72, 0.16), transparent 62%),
+            var(--dash-bg) !important;
+    }
+
+    .dashboard-dark .dash-topbar,
+    .dashboard-dark .dash-card,
+    .dashboard-dark .dash-kpi,
+    .dashboard-dark .dash-main-head {
+        background: var(--dash-surface) !important;
+        border-color: var(--dash-border) !important;
+        color: var(--dash-text);
+    }
+
+    .dashboard-dark .dash-main-head {
+        background: linear-gradient(135deg, #0f1f18 0%, #142820 100%) !important;
+        box-shadow: 0 18px 30px rgba(0, 0, 0, 0.28);
+    }
+
+    .dashboard-dark .dash-main-title {
+        color: #eaf8f0 !important;
+    }
+
+    .dashboard-dark .dash-main-subtitle {
+        color: #b7cbc0 !important;
+    }
+
+    .dashboard-dark .dash-main-kicker {
+        color: #45d08c !important;
+    }
+
+    .dashboard-dark .dashboard-shell {
+        background: #07120d;
+    }
+
+    .dashboard-dark .dash-sidebar-shell {
+        background: #06100c;
+    }
+
+    .dashboard-dark .dash-sidepanel {
+        background: linear-gradient(180deg, #0d1f16 0%, #09160f 100%);
+        border-right-color: #1f3a2e;
+        box-shadow: 10px 0 24px rgba(0, 0, 0, 0.32);
+    }
+
+    .dashboard-dark .dash-link,
+    .dashboard-dark .dash-mini-link {
+        color: #b4c8be;
+    }
+
+    .dashboard-dark .dash-link:hover,
+    .dashboard-dark .dash-link.active,
+    .dashboard-dark .dash-mini-link:hover,
+    .dashboard-dark .dash-mini-link.active {
+        background: rgba(42, 193, 118, 0.18);
+        color: #e9f7ef;
+    }
+
+    .dash-topbar,
+    .dash-main-head,
+    .dash-card,
+    .dash-kpi {
+        background: var(--dash-surface);
+        border-color: var(--dash-border);
+        color: var(--dash-text);
+    }
+
+    .dash-topbar-left {
+        gap: 0.65rem;
+    }
+
+    .dash-brand-mark {
+        width: 12px;
+        height: 34px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #22c55e, #0f7a43);
+        box-shadow: 0 4px 14px rgba(15, 122, 67, 0.35);
+    }
+
+    .dash-eyebrow {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-weight: 900;
+        color: var(--dash-text);
+        line-height: 1.1;
+    }
+
+    .dash-eyebrow-sub {
+        font-size: 11px;
+        color: var(--dash-muted);
+        font-weight: 700;
+        line-height: 1.1;
+    }
+
+    .dash-topbar-right {
+        gap: 0.55rem;
+    }
+
+    .dash-topbar-field-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: 900;
+        color: var(--dash-muted);
+    }
+
+    .dash-range-form {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        border: 1px solid var(--dash-border);
+        background: var(--dash-surface);
+        border-radius: 999px;
+        padding: 0.25rem 0.35rem 0.25rem 0.55rem;
+    }
+
+    .dash-range-select,
+    .dash-range-date {
+        border: 1px solid var(--dash-border);
+        background: var(--dash-surface-soft);
+        color: var(--dash-text);
+        border-radius: 999px;
+        padding: 0.32rem 0.6rem;
+        font-size: 11px;
+        font-weight: 800;
+    }
+
+    .dash-range-date {
+        max-width: 126px;
+    }
+
+    .dash-filter-apply {
+        border: 0;
+        border-radius: 999px;
+        padding: 0.34rem 0.8rem;
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #ffffff;
+        background: linear-gradient(135deg, var(--dash-brand), var(--dash-brand-strong));
+    }
+
+    .dash-topbar-pill {
+        border-color: var(--dash-border);
+        background: var(--dash-surface);
+        color: var(--dash-text);
+        font-weight: 800;
+        text-transform: none;
+        letter-spacing: 0.01em;
+        padding: 0.35rem 0.68rem;
+    }
+
+    .dash-profile-menu {
         position: relative;
     }
 
-    nav>a:hover::after {
-        content: attr(aria-label);
-        position: absolute;
-        bottom: -40px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        padding: 8px 12px;
-        border-radius: 6px;
-        font-size: 14px;
-        font-weight: normal;
-        white-space: nowrap;
-        z-index: 100;
-        opacity: 0;
-        animation: fadeIn 0.3s forwards;
+    .dash-profile-trigger {
+        gap: 0.4rem;
     }
 
-    @keyframes fadeIn {
-        to {
-            opacity: 1;
+    .dash-profile-dropdown {
+        position: absolute;
+        top: calc(100% + 0.5rem);
+        right: 0;
+        min-width: 190px;
+        border-radius: 0.8rem;
+        border: 1px solid var(--dash-border);
+        background: var(--dash-surface);
+        box-shadow: 0 20px 35px rgba(2, 6, 23, 0.2);
+        padding: 0.4rem;
+        z-index: 35;
+    }
+
+    .dash-profile-link,
+    .dash-profile-logout {
+        width: 100%;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        border-radius: 0.65rem;
+        padding: 0.5rem 0.55rem;
+        color: var(--dash-text);
+        font-size: 12px;
+        font-weight: 800;
+        border: 0;
+        background: transparent;
+    }
+
+    .dash-profile-link:hover,
+    .dash-profile-logout:hover {
+        background: var(--dash-surface-soft);
+    }
+
+    .dash-profile-logout {
+        color: #ef4444;
+        text-align: left;
+    }
+
+    .dash-main-head {
+        background: linear-gradient(135deg, #ffffff 0%, #eef8f2 100%);
+        border: 1px solid #d1e8d8;
+    }
+
+    .dash-main-kicker {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        font-weight: 900;
+        color: #16a34a;
+    }
+
+    .dash-main-title {
+        font-size: clamp(1.8rem, 4.2vw, 2.65rem);
+        line-height: 1;
+        font-weight: 950;
+        color: var(--dash-text);
+        margin-top: 0.2rem;
+    }
+
+    .dash-main-subtitle {
+        margin-top: 0.38rem;
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: var(--dash-muted);
+    }
+
+    .dash-kpi-major {
+        border-width: 2px;
+    }
+
+    .dash-status-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 0.2rem 0.52rem;
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+    }
+
+    .dash-status-badge.pagado {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .dash-status-badge.pendiente {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .dash-status-badge.cancelado {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .dashboard-dark .dash-status-badge.pagado {
+        background: #18442e;
+        color: #86efac;
+    }
+
+    .dashboard-dark .dash-status-badge.pendiente {
+        background: #4b3a17;
+        color: #fde68a;
+    }
+
+    .dashboard-dark .dash-status-badge.cancelado {
+        background: #4c1d1d;
+        color: #fca5a5;
+    }
+
+    .dash-empty-state {
+        border: 1px dashed var(--dash-border);
+        border-radius: 0.85rem;
+        padding: 1rem 0.9rem;
+        background: var(--dash-surface-soft);
+        text-align: center;
+    }
+
+    .dash-empty-state .material-icons {
+        font-size: 24px;
+        color: #16a34a;
+        margin-bottom: 0.3rem;
+    }
+
+    .dash-empty-title {
+        font-size: 13px;
+        font-weight: 900;
+        color: var(--dash-text);
+    }
+
+    .dash-empty-copy {
+        margin-top: 0.15rem;
+        font-size: 12px;
+        color: var(--dash-muted);
+        font-weight: 600;
+    }
+
+    .dash-mini-calendar {
+        margin-top: 0.85rem;
+        border: 1px solid var(--dash-border);
+        border-radius: 0.85rem;
+        padding: 0.7rem;
+        background: var(--dash-surface-soft);
+    }
+
+    .dash-mini-calendar-head {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--dash-muted);
+        margin-bottom: 0.5rem;
+    }
+
+    .dash-mini-calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 0.3rem;
+    }
+
+    .dash-mini-calendar-grid span {
+        text-align: center;
+        font-size: 11px;
+        padding: 0.25rem 0;
+        border-radius: 0.5rem;
+        color: var(--dash-text);
+        background: rgba(148, 163, 184, 0.1);
+        font-weight: 700;
+    }
+
+    .dash-mini-calendar-grid span.is-tour {
+        color: #ffffff;
+        background: linear-gradient(135deg, #16a34a, #0f7a43);
+        box-shadow: 0 6px 12px rgba(15, 122, 67, 0.3);
+    }
+
+    .dash-compact-table td,
+    .dash-compact-table th {
+        white-space: nowrap;
+    }
+
+    .dashboard-dark .dash-card-title,
+    .dashboard-dark .dash-kpi-label,
+    .dashboard-dark .dash-topbar-field-label {
+        color: #9fb3aa;
+    }
+
+    .dashboard-dark .dash-kpi-value,
+    .dashboard-dark .dash-card,
+    .dashboard-dark .dash-card p,
+    .dashboard-dark .dash-card td,
+    .dashboard-dark .dash-card th {
+        color: var(--dash-text);
+    }
+
+    .dashboard-dark .dash-kpi-icon {
+        background: #22372d;
+        color: #d4efe0;
+    }
+
+    .dashboard-dark .dash-kpi-reservas,
+    .dashboard-dark .dash-kpi-ingresos,
+    .dashboard-dark .dash-kpi-bloqueos,
+    .dashboard-dark .dash-kpi-penalizaciones {
+        background: linear-gradient(180deg, #132019 0%, #101a16 100%) !important;
+        border-color: #295142 !important;
+    }
+
+    .dashboard-dark .dash-kpi-value {
+        color: #eefaf2 !important;
+    }
+
+    .dashboard-dark .dash-list-row,
+    .dashboard-dark .dash-compact-table tr,
+    .dashboard-dark .dash-card .border-slate-100 {
+        border-color: #2b463b !important;
+        background: #122019;
+    }
+
+    .dashboard-dark .dash-compact-table td,
+    .dashboard-dark .dash-compact-table th,
+    .dashboard-dark .text-slate-800,
+    .dashboard-dark .text-slate-900 {
+        color: #def0e6 !important;
+    }
+
+    .dashboard-dark .text-slate-500,
+    .dashboard-dark .text-slate-600,
+    .dashboard-dark .text-slate-700 {
+        color: #9cb3a7 !important;
+    }
+
+    .dashboard-dark .dash-head-btn-primary {
+        background: linear-gradient(135deg, #148751 0%, #0f6f43 100%);
+        box-shadow: 0 10px 18px rgba(0, 0, 0, 0.28);
+    }
+
+    .dashboard-dark .dash-head-btn-secondary {
+        background: #18261f;
+        color: #d7ebe0;
+        border-color: #325548;
+    }
+
+    .dashboard-dark .dash-head-btn-secondary:hover {
+        color: #ecf8f1;
+        border-color: #45d08c;
+    }
+
+    .dashboard-dark .dash-range-select,
+    .dashboard-dark .dash-range-date,
+    .dashboard-dark .dash-topbar-pill,
+    .dashboard-dark .dash-range-form {
+        background: #16241d;
+        border-color: #2d493d;
+        color: #e6f4ed;
+    }
+
+    .dashboard-dark .dash-card::before,
+    .dashboard-dark .dash-kpi::before {
+        opacity: 0.85;
+    }
+
+    @media (max-width: 1023px) {
+        .dash-sidebar-shell {
+            width: 64px;
+            min-width: 64px;
+        }
+
+        .dash-content {
+            margin-left: 64px;
+            padding: 0.85rem !important;
+        }
+
+        .dash-sidepanel {
+            position: fixed;
+            width: min(280px, calc(100vw - 64px));
+            left: 64px;
+            transform: translateX(-110%);
+            z-index: 44;
+        }
+
+        .sidebar-expanded .dash-sidepanel {
+            transform: translateX(0);
+        }
+
+        .sidebar-collapsed .dash-sidepanel {
+            width: min(280px, calc(100vw - 64px));
+        }
+    }
+
+    @media (max-width: 640px) {
+        .dash-mobile-toggle {
+            display: inline-flex;
+            left: 0.75rem;
+            top: 0.75rem;
+        }
+
+        .dash-sidebar-shell {
+            width: 0;
+            min-width: 0;
+        }
+
+        .dash-content {
+            margin-left: 0;
+            padding: 0.9rem !important;
+            padding-top: 3.9rem !important;
+        }
+
+        .dash-sidepanel {
+            width: min(280px, 88vw);
+            left: 0;
+        }
+
+        .sidebar-collapsed .dash-sidepanel {
+            width: min(280px, 88vw);
+        }
+
+        .dash-topbar {
+            position: static;
+            padding: 0.6rem 0.7rem;
+            border-radius: 0.75rem;
+            margin-bottom: 0.85rem;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            background: #ffffff;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+        }
+
+        .dash-topbar-right {
+            width: auto;
+            justify-content: flex-end;
+            gap: 0.35rem;
+        }
+
+        .dash-range-form {
+            width: 100%;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            border-radius: 0.8rem;
+            padding: 0.45rem;
+        }
+
+        .dash-range-select,
+        .dash-range-date,
+        .dash-filter-apply {
+            border-radius: 0.6rem;
+        }
+
+        .dash-profile-menu {
+            margin-left: auto;
+        }
+
+        .dash-main-title {
+            font-size: 1.85rem;
+        }
+
+        .dash-topbar-pill {
+            font-size: 10px;
+            letter-spacing: 0.02em;
+            padding: 0.3rem 0.5rem;
+        }
+
+        .dash-topbar-left span {
+            font-size: 12px;
+        }
+
+        .dash-header-actions {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.5rem;
+        }
+
+        .dash-header-actions a {
+            width: 100%;
+            text-align: center;
+            justify-content: center;
+        }
+
+        .dash-kpi-value {
+            font-size: 1.6rem;
+        }
+
+        .dash-card {
+            padding: 0.75rem;
+            border-radius: 0.85rem;
+        }
+
+        .dash-card-head {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.45rem;
+        }
+
+        .dash-list-row {
+            padding: 0.5rem 0.55rem;
+        }
+
+        .dash-kpi-label {
+            font-size: 9px;
+        }
+
+        .panel-iframe {
+            min-height: calc(100vh - 1.5rem);
+            border-radius: 0.6rem;
         }
     }
 </style>
-{% endblock %}
+<script>
+    (function () {
+        const layout = document.getElementById('dashLayout');
+        const sidebar = document.getElementById('panelSidebar');
+        const toggleBtn = document.getElementById('sidebarToggleBtn');
+        const toggleIcon = document.getElementById('sidebarToggleIcon');
+        const mobileToggleBtn = document.getElementById('mobileSidebarToggleBtn');
+        const mobileToggleIcon = document.getElementById('mobileSidebarToggleIcon');
+        const backdrop = document.getElementById('sidebarBackdrop');
+        const dashboardView = document.getElementById('panelDashboardView');
+        const embeddedView = document.getElementById('panelEmbeddedView');
+        const embeddedFrame = document.getElementById('panelEmbeddedFrame');
+        const dashRoot = document.getElementById('dashRoot');
+        const themeToggleBtn = document.getElementById('dashThemeToggle');
+        const themeIcon = document.getElementById('dashThemeIcon');
+        const themeLabel = document.getElementById('dashThemeLabel');
+        const profileMenu = document.getElementById('dashProfileMenu');
+        const profileMenuBtn = document.getElementById('dashProfileMenuBtn');
+        const profileDropdown = document.getElementById('dashProfileDropdown');
+        const desktopQuery = window.matchMedia('(min-width: 1024px)');
+        const panelAdminPath = "{% url 'panel_admin' %}";
+        const PANEL_VIEW_PARAM = "view";
+        const PANEL_LAST_VIEW_KEY = "panel:last-view";
+        const PANEL_THEME_KEY = "panel:theme";
+        const actividadWrap = document.getElementById('actividadSecretariasPanelWrap');
+        const revealDashboard = () => {
+            if (dashRoot) dashRoot.style.visibility = 'visible';
+        };
 
+        if (!layout || !sidebar || !toggleBtn || !toggleIcon || !backdrop || !dashboardView || !embeddedView || !embeddedFrame) {
+            revealDashboard();
+            return;
+        }
+
+        let expanded = false;
+
+        const render = () => {
+            layout.classList.toggle('sidebar-expanded', expanded);
+            layout.classList.toggle('sidebar-collapsed', !expanded);
+            toggleIcon.textContent = expanded ? 'close' : 'menu';
+            if (mobileToggleIcon) mobileToggleIcon.textContent = expanded ? 'close' : 'menu';
+            backdrop.classList.toggle('hidden', desktopQuery.matches || !expanded);
+        };
+
+        const applyTheme = (themeName) => {
+            const isDark = themeName === 'dark';
+            if (dashRoot) {
+                dashRoot.classList.toggle('dashboard-dark', isDark);
+            }
+            if (themeIcon) themeIcon.textContent = isDark ? 'light_mode' : 'dark_mode';
+            if (themeLabel) themeLabel.textContent = isDark ? 'Claro' : 'Oscuro';
+        };
+
+        toggleBtn.addEventListener('click', () => {
+            expanded = !expanded;
+            render();
+        });
+
+        mobileToggleBtn?.addEventListener('click', () => {
+            expanded = !expanded;
+            render();
+        });
+
+        backdrop.addEventListener('click', () => {
+            expanded = false;
+            render();
+        });
+
+        profileMenuBtn?.addEventListener('click', () => {
+            const willOpen = profileDropdown?.classList.contains('hidden');
+            profileDropdown?.classList.toggle('hidden');
+            profileMenuBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        });
+
+        themeToggleBtn?.addEventListener('click', () => {
+            const isDark = dashRoot?.classList.contains('dashboard-dark');
+            const nextTheme = isDark ? 'light' : 'dark';
+            localStorage.setItem(PANEL_THEME_KEY, nextTheme);
+            applyTheme(nextTheme);
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && expanded) {
+                expanded = false;
+                render();
+            }
+        });
+
+        document.addEventListener('click', (event) => {
+            if (profileMenu && profileDropdown && !profileDropdown.classList.contains('hidden') && !profileMenu.contains(event.target)) {
+                profileDropdown.classList.add('hidden');
+                profileMenuBtn?.setAttribute('aria-expanded', 'false');
+            }
+            if (expanded && desktopQuery.matches && !sidebar.contains(event.target)) {
+                expanded = false;
+                render();
+            }
+        });
+
+        sidebar.querySelectorAll('a').forEach((a) => {
+            a.addEventListener('click', () => {
+                expanded = false;
+                render();
+            });
+        });
+
+        const normalizePath = (hrefValue) => {
+            if (!hrefValue) return "";
+            try {
+                return new URL(hrefValue, window.location.origin).pathname;
+            } catch (e) {
+                return hrefValue;
+            }
+        };
+
+        const setActiveMenu = (hrefValue) => {
+            const targetPath = normalizePath(hrefValue);
+            sidebar.querySelectorAll('.dash-link, .dash-mini-link').forEach((item) => {
+                item.classList.remove('active');
+            });
+            sidebar.querySelectorAll('.dash-link, .dash-mini-link').forEach((item) => {
+                const itemHref = item.getAttribute('href');
+                if (normalizePath(itemHref) === targetPath) {
+                    item.classList.add('active');
+                }
+            });
+        };
+
+        const syncBrowserView = (viewUrl) => {
+            const next = new URL(window.location.href);
+            if (viewUrl) {
+                next.searchParams.set(PANEL_VIEW_PARAM, viewUrl);
+                sessionStorage.setItem(PANEL_LAST_VIEW_KEY, viewUrl);
+            } else {
+                next.searchParams.delete(PANEL_VIEW_PARAM);
+                sessionStorage.removeItem(PANEL_LAST_VIEW_KEY);
+            }
+            // Evita hashes viejos que rompen el estado al refrescar.
+            next.hash = "";
+            window.history.replaceState({}, "", `${next.pathname}${next.search}`);
+        };
+
+        const loadInternalPanel = (url, options = { syncUrl: true }) => {
+            const src = new URL(url, window.location.origin);
+            if (src.pathname === panelAdminPath) {
+                setActiveMenu(panelAdminPath);
+                showDashboard(options);
+                return;
+            }
+            src.searchParams.set('embed', '1');
+            dashboardView.classList.add('hidden');
+            embeddedView.classList.remove('hidden');
+            embeddedFrame.src = src.toString();
+            if (options.syncUrl !== false) {
+                syncBrowserView(url);
+            }
+        };
+
+        const withEmbedParam = (hrefValue) => {
+            if (!hrefValue) return hrefValue;
+            try {
+                const parsed = new URL(hrefValue, window.location.origin);
+                if (parsed.origin !== window.location.origin) return hrefValue;
+                if (!parsed.pathname.startsWith('/panel/')) return hrefValue;
+                parsed.searchParams.set('embed', '1');
+                return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+            } catch (e) {
+                return hrefValue;
+            }
+        };
+
+        const enforceEmbedInsideFrame = (frameDocument) => {
+            // Mantiene el modo embed al navegar entre módulos del panel dentro del iframe.
+            frameDocument.querySelectorAll('a[href]').forEach((link) => {
+                const href = link.getAttribute('href');
+                if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+                link.setAttribute('href', withEmbedParam(href));
+            });
+
+            frameDocument.querySelectorAll('form').forEach((form) => {
+                const action = form.getAttribute('action') || frameDocument.location.pathname;
+                const normalizedAction = withEmbedParam(action);
+                form.setAttribute('action', normalizedAction);
+                if (!form.querySelector('input[name="embed"]')) {
+                    const hidden = frameDocument.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.name = 'embed';
+                    hidden.value = '1';
+                    form.appendChild(hidden);
+                }
+            });
+        };
+
+        const showDashboard = (options = { syncUrl: true }) => {
+            embeddedFrame.src = 'about:blank';
+            embeddedView.classList.add('hidden');
+            dashboardView.classList.remove('hidden');
+            if (options.syncUrl !== false) {
+                syncBrowserView("");
+            }
+        };
+
+        const initActividadSecretariasAsync = () => {
+            if (!actividadWrap) return;
+            const form = actividadWrap.querySelector('#actividadSecretariasFilterForm');
+            if (!form) return;
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const dateInput = form.querySelector('input[name="actividad_fecha"]');
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = '...';
+                }
+                try {
+                    const url = new URL(form.getAttribute('action'), window.location.origin);
+                    if (dateInput && dateInput.value) {
+                        url.searchParams.set('actividad_fecha', dateInput.value);
+                    }
+                    const response = await fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                    if (!response.ok) throw new Error('No se pudo cargar la actividad.');
+                    const html = await response.text();
+                    actividadWrap.innerHTML = html;
+                    initActividadSecretariasAsync();
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Ver';
+                    }
+                }
+            });
+        };
+
+        sidebar.querySelectorAll('a[data-panel-url]').forEach((a) => {
+            a.addEventListener('click', (event) => {
+                event.preventDefault();
+                const targetUrl = a.getAttribute('data-panel-url');
+                if (!targetUrl) return;
+                setActiveMenu(targetUrl);
+                loadInternalPanel(targetUrl);
+            });
+        });
+
+        sidebar.querySelectorAll('a:not([data-panel-url])').forEach((a) => {
+            a.addEventListener('click', (event) => {
+                const href = a.getAttribute('href');
+                if (!href) return;
+                if (href === "{% url 'panel_admin' %}") {
+                    event.preventDefault();
+                    setActiveMenu(href);
+                    showDashboard();
+                }
+            });
+        });
+
+        embeddedFrame.addEventListener('load', () => {
+            try {
+                const frameWindow = embeddedFrame.contentWindow;
+                const frameDocument = embeddedFrame.contentDocument;
+                if (!frameWindow || !frameDocument) return;
+
+                const loadedPath = frameWindow.location.pathname;
+                if (loadedPath === panelAdminPath) {
+                    setActiveMenu(panelAdminPath);
+                    showDashboard();
+                    return;
+                }
+
+                enforceEmbedInsideFrame(frameDocument);
+
+                const styleEl = frameDocument.createElement('style');
+                styleEl.textContent = `
+                    html, body {
+                        overflow-y: hidden !important;
+                        scrollbar-width: none !important;
+                        -ms-overflow-style: none !important;
+                    }
+                    html::-webkit-scrollbar, body::-webkit-scrollbar {
+                        width: 0 !important;
+                        height: 0 !important;
+                    }
+                `;
+                frameDocument.head.appendChild(styleEl);
+
+                const adjustEmbeddedFrameHeight = () => {
+                    const frameHeight = Math.max(
+                        frameDocument.body ? frameDocument.body.scrollHeight : 0,
+                        frameDocument.documentElement ? frameDocument.documentElement.scrollHeight : 0
+                    );
+                    embeddedFrame.style.height = `${Math.max(frameHeight, 700)}px`;
+                };
+
+                // Ajuste inicial
+                adjustEmbeddedFrameHeight();
+
+                // Ajuste dinámico cuando el contenido interno cambia (abrir/cerrar bloques, filtros, etc.)
+                if (frameWindow.ResizeObserver) {
+                    const ro = new frameWindow.ResizeObserver(() => adjustEmbeddedFrameHeight());
+                    if (frameDocument.body) ro.observe(frameDocument.body);
+                    if (frameDocument.documentElement) ro.observe(frameDocument.documentElement);
+                }
+
+                frameWindow.addEventListener('resize', adjustEmbeddedFrameHeight);
+                frameDocument.addEventListener('click', () => setTimeout(adjustEmbeddedFrameHeight, 60));
+            } catch (e) {
+                // Ignore iframe access edge cases.
+            }
+        });
+
+        const initialView = new URL(window.location.href).searchParams.get(PANEL_VIEW_PARAM) || sessionStorage.getItem(PANEL_LAST_VIEW_KEY);
+        if (initialView) {
+            setActiveMenu(initialView);
+            loadInternalPanel(initialView, { syncUrl: false });
+        } else {
+            showDashboard({ syncUrl: false });
+        }
+
+        desktopQuery.addEventListener('change', () => {
+            if (desktopQuery.matches) {
+                expanded = false;
+            }
+            render();
+        });
+
+        const savedTheme = localStorage.getItem(PANEL_THEME_KEY) || 'light';
+        applyTheme(savedTheme);
+
+        initActividadSecretariasAsync();
+        render();
+        revealDashboard();
+    })();
+</script>
+{% endblock %}

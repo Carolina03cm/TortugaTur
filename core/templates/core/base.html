@@ -43,12 +43,20 @@
             }
         }
     </script>
+    {% if request.GET.embed == '1' %}
+    <style>
+        a[href="{% url 'panel_admin' %}"] {
+            display: none !important;
+        }
+    </style>
+    {% endif %}
     {% block extra_css %}{% endblock %}
 </head>
 
 <body
     class="bg-background-light dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-display flex flex-col min-h-screen transition-colors duration-300">
 
+    {% if '/panel/' not in request.path and request.GET.embed != '1' %}
     <nav
         class="fixed w-full z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-800 transition-colors duration-300">
         <div class="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
@@ -254,8 +262,9 @@
             {% endif %}
         </div>
     </nav>
+    {% endif %}
 
-    <main class="pt-20 flex-grow">
+    <main class="{% if '/panel/' in request.path or request.GET.embed == '1' %}flex-grow{% else %}pt-20 flex-grow{% endif %}">
         {% if messages %}
         <div class="max-w-7xl mx-auto px-6 mt-6" id="global-messages-container">
             {% for message in messages %}
@@ -311,6 +320,7 @@
         {% block content %}{% endblock %}
     </main>
 
+    {% if '/panel/' not in request.path and request.GET.embed != '1' %}
     <a href="https://wa.me/5930939833971" target="_blank" id="whatsapp-btn-dynamic"
         class="fixed bottom-8 right-8 z-[60] flex items-center justify-center w-16 h-16 bg-[#25D366] text-white rounded-full shadow-2xl hover:scale-110 transition-all group">
         <i class="fa-brands fa-whatsapp text-3xl"></i>
@@ -331,7 +341,9 @@
             }
         });
     </script>
+    {% endif %}
 
+    {% if '/panel/' not in request.path and request.GET.embed != '1' %}
     <footer class="bg-slate-900 text-slate-300 mt-12">
         <div class="max-w-7xl mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-4 gap-12">
             <div class="space-y-4">
@@ -387,6 +399,7 @@
             &copy; 2026 TortugaTur. Todos los derechos reservados.
         </div>
     </footer>
+    {% endif %}
 
     <div id="google_translate_element_mobile" style="display:none;"></div>
 
