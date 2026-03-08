@@ -47,14 +47,7 @@ def _parse_csv(raw):
     return [item.strip() for item in (raw or "").split(",") if item.strip()]
 
 
-ALLOWED_HOSTS = _parse_csv(os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost"))
-CSRF_TRUSTED_ORIGINS = _parse_csv(
-    os.getenv(
-        "CSRF_TRUSTED_ORIGINS",
-        "https://*.ngrok-free.dev,https://*.ngrok.app,https://*.ngrok.io",
-    )
-)
-
+ALLOWED_HOSTS = ['tortugatourec.pythonanywhere.com']
 
 # Application definition
 
