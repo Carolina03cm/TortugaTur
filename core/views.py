@@ -2319,6 +2319,10 @@ def vista_login(request):
 @never_cache
 def vista_logout(request):
     """Cierra la sesiÃ³n y redirige a la pÃ¡gina de inicio."""
+    # Limpia cualquier mensaje pendiente (por ejemplo, de login) para evitar dobles.
+    storage = messages.get_messages(request)
+    for _ in storage:
+        pass
     logout(request)
     messages.info(request, "Has cerrado sesión correctamente.")
     return redirect('home')
@@ -4403,6 +4407,7 @@ def reset_agencia_password(request, user_id):
         "tipo": "reset",
     }
     return _redir_agencias(to_top=True)
+
 
 
 
