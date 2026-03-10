@@ -2098,6 +2098,7 @@ def editar_salida(request, salida_id):
 @user_passes_test(es_admin_o_secretaria)
 def crear_salida(request):
     tours = Tour.objects.all()
+    es_secretaria_user = es_secretaria(request.user) and not es_admin(request.user)
     
     if request.method == "POST":
         tour_id = request.POST.get("tour")
@@ -2109,6 +2110,7 @@ def crear_salida(request):
         duracion = request.POST.get("duracion")
         
         tour = get_object_or_404(Tour, id=tour_id)
+        horas_definidas = [h for h in [tour.hora_turno_1, tour.hora_turno_2] if h]
         
         from datetime import datetime
         fecha_inicio = datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date()
@@ -2124,11 +2126,25 @@ def crear_salida(request):
         for f in fechas:
             # Turnos a crear
             horas = []
-            if ambos_turnos:
-                if tour.hora_turno_1: horas.append(tour.hora_turno_1)
-                if tour.hora_turno_2: horas.append(tour.hora_turno_2)
-            elif hora_post:
-                horas.append(hora_post)
+            if es_secretaria_user:
+                if not horas_definidas:
+                    messages.error(request, "Este tour no tiene horarios definidos por el admin.")
+                    return redirect("crear_salida")
+                if hora_post:
+                    horas_validas = {h.strftime("%H:%M") for h in horas_definidas}
+                    if hora_post not in horas_validas:
+                        messages.error(request, "Selecciona un horario definido por el admin.")
+                        return redirect("crear_salida")
+                    horas.append(hora_post)
+                else:
+                    messages.error(request, "Debes seleccionar un horario definido por el admin.")
+                    return redirect("crear_salida")
+            else:
+                if ambos_turnos:
+                    if tour.hora_turno_1: horas.append(tour.hora_turno_1)
+                    if tour.hora_turno_2: horas.append(tour.hora_turno_2)
+                elif hora_post:
+                    horas.append(hora_post)
             
             for h in horas:
                 # Evitar duplicados exactos
@@ -2147,7 +2163,7 @@ def crear_salida(request):
         messages.success(request, f"¡Se han programado {salidas_creadas} salidas correctamente!")
         return redirect("admin_salidas")
 
-    return render(request, "core/panel/crear_salida.html", {"tours": tours})
+    return render(request, "core/panel/crear_salida.html", {"tours": tours, "es_secretaria": es_secretaria_user})
 
 @login_required
 @user_passes_test(es_admin)

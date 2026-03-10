@@ -46,7 +46,9 @@
                             <option value="" disabled selected>Elige un tour de la lista...</option>
                             {% for t in tours %}
                             <option value="{{ t.id }}" data-cupo="{{ t.cupo_maximo }}"
-                                data-duracion="{{ t.duracion|default:'' }}">{{ t.nombre }} — {{ t.destino.nombre }}
+                                data-duracion="{{ t.duracion|default:'' }}"
+                                data-hora1="{% if t.hora_turno_1 %}{{ t.hora_turno_1|time:'H:i' }}{% endif %}"
+                                data-hora2="{% if t.hora_turno_2 %}{{ t.hora_turno_2|time:'H:i' }}{% endif %}">{{ t.nombre }} — {{ t.destino.nombre }}
                             </option>
                             {% endfor %}
                         </select>
@@ -56,49 +58,45 @@
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label class="block text-[11px] uppercase tracking-wider font-black text-slate-400 mb-2">Fecha
-                            Inicio (o fecha única)</label>
-                        <div class="relative">
-                            <span class="material-icons absolute left-3 top-3 text-slate-400">calendar_today</span>
-                            <input type="date" name="fecha" required
-                                class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition text-slate-700">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-[11px] uppercase tracking-wider font-black text-slate-400 mb-2">Fecha
-                            Fin (Opcional para rango)</label>
-                        <div class="relative">
-                            <span class="material-icons absolute left-3 top-3 text-slate-400">event_repeat</span>
-                            <input type="date" name="fecha_fin"
-                                class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition text-slate-700">
-                        </div>
-                    </div>
-                </div>
+    {% if es_secretaria %}
+    <div>
+        <label class="block text-[11px] uppercase tracking-wider font-black text-slate-400 mb-2">
+            Horario (definido por admin)
+        </label>
+        <div class="relative">
+            <span class="material-icons absolute left-3 top-3 text-slate-400">schedule</span>
+            <select name="hora" id="horaSelect" required
+                class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition text-slate-700">
+                <option value="" disabled selected>Selecciona un horario...</option>
+            </select>
+        </div>
+        <p class="text-[10px] text-slate-400 font-bold mt-2">Solo puedes usar horarios definidos por el admin.</p>
+    </div>
+    <div class="hidden md:block"></div>
+    {% else %}
+    <div>
+        <label class="block text-[11px] uppercase tracking-wider font-black text-slate-400 mb-2">Hora de
+            Inicio (Si es fecha única o manual)</label>
+        <div class="relative">
+            <span class="material-icons absolute left-3 top-3 text-slate-400">schedule</span>
+            <input type="time" name="hora"
+                class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition text-slate-700">
+        </div>
+    </div>
+    <div class="flex items-center gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+        <input type="checkbox" name="ambos_turnos" id="ambosTurnos"
+            class="w-6 h-6 text-primary border-slate-300 rounded focus:ring-primary cursor-pointer">
+        <div>
+            <label for="ambosTurnos" class="text-sm font-black text-slate-700 cursor-pointer">CREAR
+                TURNOS DEL TOUR</label>
+            <p class="text-[10px] text-slate-400 font-bold">Usa los horarios predefinidos del tour
+                (Mañana/Tarde)</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label class="block text-[11px] uppercase tracking-wider font-black text-slate-400 mb-2">Hora de
-                            Inicio (Si es fecha única o manual)</label>
-                        <div class="relative">
-                            <span class="material-icons absolute left-3 top-3 text-slate-400">schedule</span>
-                            <input type="time" name="hora"
-                                class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition text-slate-700">
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                        <input type="checkbox" name="ambos_turnos" id="ambosTurnos"
-                            class="w-6 h-6 text-primary border-slate-300 rounded focus:ring-primary cursor-pointer">
-                        <div>
-                            <label for="ambosTurnos" class="text-sm font-black text-slate-700 cursor-pointer">CREAR
-                                TURNOS DEL TOUR</label>
-                            <p class="text-[10px] text-slate-400 font-bold">Usa los horarios predefinidos del tour
-                                (Mañana/Tarde)</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
                     <div id="cupoContainer">
                         <label class="block text-[11px] uppercase tracking-wider font-black text-slate-400 mb-2">
                             Cupo de Personas
@@ -160,6 +158,7 @@
     document.addEventListener('DOMContentLoaded', function () {
         const tourSelect = document.getElementById('tourSelect');
         const cupoInput = document.getElementById('cupoMaximo');
+        const horaSelect = document.getElementById('horaSelect');
         const cupoContainer = document.getElementById('cupoContainer');
         const cupoInfo = document.getElementById('cupoSourceInfo');
 
@@ -168,6 +167,8 @@
             const selectedOption = this.options[this.selectedIndex];
             const tourCupo = selectedOption.getAttribute('data-cupo');
             const tourDuracion = selectedOption.getAttribute('data-duracion');
+            const hora1 = selectedOption.getAttribute('data-hora1');
+            const hora2 = selectedOption.getAttribute('data-hora2');
             const duracionInput = document.getElementById('duracionTour');
             const duracionContainer = document.getElementById('duracionContainer');
 
@@ -195,6 +196,18 @@
                 cupoInput.value = '';
                 cupoInfo.classList.add('hidden');
             }
+
+            if (horaSelect) {
+                horaSelect.innerHTML = '<option value="" disabled selected>Selecciona un horario...</option>';
+                const horas = [hora1, hora2].filter(Boolean);
+                horas.forEach((h) => {
+                    const opt = document.createElement('option');
+                    opt.value = h;
+                    opt.textContent = h;
+                    horaSelect.appendChild(opt);
+                });
+                horaSelect.disabled = horas.length === 0;
+            }
         });
 
         // Validación del formulario
@@ -203,7 +216,7 @@
                 event.preventDefault();
                 alert('Por favor, selecciona un tour antes de continuar.');
             }
-
+\n            if (horaSelect && !horaSelect.value) {\r\n                event.preventDefault();\r\n                alert('Selecciona un horario definido por el admin.');\r\n            }\r\n\r\n
             const cupoValue = parseInt(cupoInput.value);
             if (isNaN(cupoValue) || cupoValue < 1) {
                 event.preventDefault();
@@ -248,3 +261,5 @@
     }
 </style>
 {% endblock %}
+
+

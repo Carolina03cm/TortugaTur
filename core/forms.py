@@ -31,10 +31,14 @@ class TourForm(forms.ModelForm):
         cleaned_data = super().clean()
         precio = cleaned_data.get("precio")
         precio_adulto = cleaned_data.get("precio_adulto")
+        precio_nino = cleaned_data.get("precio_nino")
 
         # Si no se define precio adulto, usar el precio base del tour.
         if precio is not None and (precio_adulto is None or precio_adulto <= 0):
             cleaned_data["precio_adulto"] = precio
+        # Si no se define precio nino, usar el precio base del tour.
+        if precio is not None and (precio_nino is None or precio_nino <= 0):
+            cleaned_data["precio_nino"] = precio
 
         return cleaned_data
 
