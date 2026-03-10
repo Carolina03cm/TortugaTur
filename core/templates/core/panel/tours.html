@@ -1,372 +1,179 @@
-{% extends "core/base.html" %}
+﻿{% extends "core/base.html" %}
 
-{% block title %}Gestión de Tours | TortugaTur{% endblock %}
+{% block title %}Tours | TortugaTur{% endblock %}
 
 {% block extra_head %}
-<!-- FullCalendar CSS and JS -->
 <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js'></script>
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/es.js'></script>
 <style>
-    .fc-event {
-        cursor: pointer;
-    }
-
-    .fc-toolbar-title {
-        font-weight: 900 !important;
-        text-transform: uppercase;
-        letter-spacing: -0.025em;
-    }
-
-    .fc-button-primary {
-        background-color: #0f172a !important;
-        border-color: #0f172a !important;
-    }
-
-    .fc-button-primary:hover {
-        background-color: #13B6EC !important;
-        border-color: #13B6EC !important;
-    }
+  .fc-event { cursor: pointer; }
+  .fc-toolbar-title { font-weight: 800 !important; }
+  .fc-button-primary { background-color: #0f172a !important; border-color: #0f172a !important; }
+  .fc-button-primary:hover { background-color: #0f766e !important; border-color: #0f766e !important; }
 </style>
 {% endblock %}
 
 {% block content %}
-<main class="bg-slate-50 min-h-screen py-12" role="main">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="min-h-screen bg-slate-100 py-8">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
-        <!-- Header Section with Breadcrumb Navigation -->
-        <nav class="mb-4 flex" aria-label="Breadcrumb">
-            <ol class="inline-flex items-center space-x-1 md:space-x-2">
-                <li class="inline-flex items-center">
-                    <a href="{% url 'panel_admin' %}" class="text-sm font-medium text-slate-500 hover:text-primary">
-                        <span class="material-icons text-xs mr-1">dashboard</span>
-                        Panel Principal
-                    </a>
-                </li>
-                <li>
-                    <div class="flex items-center">
-                        <span class="material-icons text-slate-400 text-xs">chevron_right</span>
-                        <span class="ml-1 text-sm font-medium text-slate-700">Gestión de Tours</span>
-                    </div>
-                </li>
-            </ol>
-        </nav>
+    <section class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <p class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Catalogo</p>
+          <h1 class="text-3xl font-black text-slate-900">Gestion de Tours</h1>
+          <p class="text-sm text-slate-500 mt-1">Crea tours, ajusta precios y administra su disponibilidad.</p>
+        </div>
+        <a href="{% url 'panel_admin' %}" class="h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-bold inline-flex items-center gap-2 hover:border-slate-300 w-max">
+          <span class="material-icons text-[18px]">arrow_back</span>Panel
+        </a>
+      </div>
+    </section>
 
-        <div class="flex items-center justify-between mb-10">
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <section class="xl:col-span-1 space-y-4">
+        {% if solo_lectura %}
+        <div class="rounded-2xl border border-amber-200 bg-amber-50 text-amber-800 px-4 py-3 text-sm font-semibold">
+          Modo solo lectura. Puedes consultar tours y calendario.
+        </div>
+        {% endif %}
+
+        {% if not solo_lectura %}
+        <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+          <h2 class="text-lg font-extrabold text-slate-900 mb-4">Nuevo tour</h2>
+          <form method="post" class="space-y-4">
+            {% csrf_token %}
+            {% for field in form %}
             <div>
-                <h1 class="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                    <span class="material-icons text-primary text-4xl">beach_access</span>
-                    Gestión de Tours
-                </h1>
-                <p class="text-slate-500 mt-1">Administra las experiencias turísticas y asígnalas a destinos
-                    específicos.</p>
+              <label for="{{ field.id_for_label }}" class="block text-[11px] font-black uppercase tracking-[0.08em] text-slate-500 mb-1">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
+              {% if field.errors %}<p class="text-xs text-rose-600 mt-1">{{ field.errors }}</p>{% endif %}
             </div>
-            <a href="{% url 'panel_admin' %}"
-                class="group flex items-center gap-2 bg-white border border-slate-200 px-6 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-50 hover:border-primary/20 hover:text-primary transition-all shadow-sm"
-                aria-label="Volver al panel administrativo principal">
-                <span class="material-icons text-sm">arrow_back</span>
-                <span>Volver al Panel</span>
-            </a>
+            {% endfor %}
+            <button type="submit" class="w-full h-11 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800">Crear tour</button>
+          </form>
         </div>
+        {% endif %}
+      </section>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <!-- Tour Creation Form -->
-            <div class="lg:col-span-1">
-                {% if solo_lectura %}
-                <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 mb-4 text-sm font-semibold">
-                    Modo solo lectura para secretaria. Puedes consultar tours y calendario, pero no crear, editar ni eliminar.
-                </div>
-                {% endif %}
-                {% if not solo_lectura %}
-                <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 sticky top-6">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
-                            <span class="material-icons">add_circle</span>
-                        </div>
-                        <h2 class="text-xl font-bold text-slate-900">Nuevo Tour</h2>
-                    </div>
-
-                    <form method="post" class="space-y-4" aria-label="Formulario de creación de tour">
+      <section class="xl:col-span-2 space-y-6">
+        <div class="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+          <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <h3 class="text-lg font-extrabold text-slate-900">Listado de tours</h3>
+            <span class="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-700">{{ tours|length }} tours</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-950 text-white text-[10px] uppercase tracking-[0.16em]">
+                <tr>
+                  <th class="px-6 py-4 text-left">Tour</th>
+                  <th class="px-6 py-4 text-left">Destino</th>
+                  <th class="px-6 py-4 text-left">Precios</th>
+                  <th class="px-6 py-4 text-left">Lemon</th>
+                  <th class="px-6 py-4 text-left">Cupos</th>
+                  <th class="px-6 py-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                {% for tour in tours %}
+                <tr class="hover:bg-slate-50">
+                  <td class="px-6 py-4">
+                    <p class="font-bold text-slate-900">{{ tour.nombre }}</p>
+                    <p class="text-xs text-slate-500 truncate max-w-[240px]" title="{{ tour.descripcion }}">{{ tour.descripcion }}</p>
+                  </td>
+                  <td class="px-6 py-4"><span class="px-2 py-1 bg-slate-100 rounded-md text-slate-700 font-semibold">{{ tour.destino.nombre }}</span></td>
+                  <td class="px-6 py-4">
+                    {% with p_adulto=tour.precio_adulto|default:tour.precio %}
+                    <p class="font-bold text-slate-900">Adulto: ${{ p_adulto }}</p>
+                    {% endwith %}
+                    {% with p_nino=tour.precio_nino|default:tour.precio %}
+                    <p class="text-xs text-slate-600">Nino: ${{ p_nino }}</p>
+                    {% endwith %}
+                  </td>
+                  <td class="px-6 py-4 text-xs text-slate-600 font-mono">{% if tour.lemonsqueezy_variant_id %}{{ tour.lemonsqueezy_variant_id }}{% else %}-{% endif %}</td>
+                  <td class="px-6 py-4"><span class="font-mono text-slate-700">{{ tour.cupo_maximo }}</span></td>
+                  <td class="px-6 py-4 text-right">
+                    {% if not solo_lectura %}
+                    <div class="inline-flex items-center gap-2">
+                      <a href="{% url 'editar_tour' tour.id %}" class="h-9 px-3 rounded-lg bg-slate-900 text-white text-xs font-bold inline-flex items-center hover:bg-slate-800">Editar</a>
+                      <form method="post" action="{% url 'eliminar_tour' tour.id %}" class="inline" onsubmit="return confirm('Eliminar este tour y sus salidas?');">
                         {% csrf_token %}
-                        {% for field in form %}
-                        <div class="form-group">
-                            <label for="{{ field.id_for_label }}"
-                                class="block text-xs font-black uppercase text-slate-400 mb-1 ml-1">
-                                {{ field.label }}
-                                {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
-                            </label>
-                            {{ field }}
-                            {% if field.help_text %}
-                            <p class="text-xs text-slate-400 mt-1 ml-1">{{ field.help_text }}</p>
-                            {% endif %}
-                            {% if field.errors %}
-                            <div class="text-xs text-red-500 mt-1 ml-1">{{ field.errors }}</div>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                        <button type="submit"
-                            class="w-full py-4 bg-primary text-white rounded-xl font-black hover:bg-slate-900 transition-all shadow-lg shadow-primary/20 mt-6 flex items-center justify-center gap-2">
-                            <span class="material-icons text-sm">add_circle</span>
-                            <span>CREAR TOUR</span>
-                        </button>
-                    </form>
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Tours List -->
-            <div class="lg:col-span-2">
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="p-6 border-b border-slate-100 flex justify-between items-center">
-                        <div>
-                            <h3 class="text-lg font-bold text-slate-900">Listado de Tours</h3>
-                            <p class="text-sm text-slate-500">Administra los tours existentes</p>
-                        </div>
-                        <div class="flex gap-2">
-                            <span class="bg-primary/10 text-primary text-xs px-3 py-1 rounded-full font-medium">
-                                Total: {{ tours|length }}
-                            </span>
-                        </div>
+                        <button type="submit" class="h-9 px-3 rounded-lg border border-rose-200 text-rose-600 text-xs font-bold hover:bg-rose-50">Borrar</button>
+                      </form>
                     </div>
-
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse" aria-label="Lista de tours disponibles">
-                            <thead class="bg-slate-50 border-b border-slate-200">
-                                <tr>
-                                    <th class="p-5 text-xs font-black uppercase text-slate-400">Tour</th>
-                                    <th class="p-5 text-xs font-black uppercase text-slate-400">Destino</th>
-                                    <th class="p-5 text-xs font-black uppercase text-slate-400">Precio</th>
-                                    <th class="p-5 text-xs font-black uppercase text-slate-400">Variant Lemon</th>
-                                    <th class="p-5 text-xs font-black uppercase text-slate-400">Cupos</th>
-                                    <th class="p-5 text-xs font-black uppercase text-slate-400">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                {% for tour in tours %}
-                                <tr class="hover:bg-slate-50/50 transition">
-                                    <td class="p-5">
-                                        <div class="font-bold text-slate-900">{{ tour.nombre }}</div>
-                                        <div class="text-xs text-slate-400 truncate w-48"
-                                            title="{{ tour.descripcion }}">{{ tour.descripcion }}</div>
-                                    </td>
-                                    <td class="p-5 text-sm text-slate-600">
-                                        <span class="px-2 py-1 bg-slate-100 rounded-md">{{ tour.destino.nombre }}</span>
-                                    </td>
-                                    <td class="p-5">
-                                        {% with p_adulto=tour.precio_adulto|default:tour.precio %}
-                                        <div class="font-black text-slate-900">${{ p_adulto }}</div>
-                                        {% endwith %}
-                                        <div class="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">
-                                            Adulto</div>
-
-                                        {% with p_nino=tour.precio_nino|default:tour.precio %}
-                                        <div class="mt-2 font-medium text-slate-700">${{ p_nino }}</div>
-                                        {% endwith %}
-                                        <div class="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">
-                                            Niño</div>
-                                    </td>
-                                    <td class="p-5 text-sm text-slate-500">
-                                        {% if tour.lemonsqueezy_variant_id %}
-                                        <span class="font-mono">{{ tour.lemonsqueezy_variant_id }}</span>
-                                        {% else %}
-                                        <span class="text-slate-400">—</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="p-5 text-center">
-                                        {% with cupos=tour.cupo_maximo %}
-                                        <div
-                                            class="inline-block bg-slate-50 px-4 py-1.5 rounded-full border border-slate-100 font-bold text-slate-900">
-                                            {% if cupos %}{{ cupos }}{% endif %}</div>
-                                        {% endwith %}
-                                    </td>
-                                    <td class="p-5">
-                                        <div class="flex gap-2">
-                                            {% if not solo_lectura %}
-                                            <a href="{% url 'editar_tour' tour.id %}"
-                                                class="inline-flex items-center px-3 py-2 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-primary transition"
-                                                title="Editar este tour">
-                                                <span class="material-icons text-xs mr-1">edit</span> Editar
-                                            </a>
-
-                                            <form method="post" action="{% url 'eliminar_tour' tour.id %}"
-                                                class="inline"
-                                                onsubmit="return confirm('¿Estás seguro de eliminar este tour? Se eliminarán todas las salidas asociadas.');">
-                                                {% csrf_token %}
-                                                <button type="submit"
-                                                    class="inline-flex items-center px-3 py-2 rounded-lg border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50 transition"
-                                                    title="Eliminar este tour">
-                                                    <span class="material-icons text-xs mr-1">delete</span> Borrar
-                                                </button>
-                                            </form>
-                                            {% else %}
-                                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Solo lectura</span>
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="6" class="p-20 text-center">
-                                        <div class="flex flex-col items-center justify-center">
-                                            <span class="material-icons text-4xl text-slate-300 mb-3">hiking</span>
-                                            <p class="text-slate-400 mb-2">No hay tours creados.</p>
-                                            <p class="text-xs text-slate-300">Utiliza el formulario para crear tu primer
-                                                tour</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- CALENDARIO DE DISPONIBILIDAD -->
-                <div id="calendario"
-                    class="mt-12 bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
-                    <div class="p-8 border-b border-slate-100 bg-slate-900 text-white">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <h3 class="text-2xl font-black tracking-tight uppercase">Calendario de Disponibilidad
-                                </h3>
-                                <p class="text-slate-400 text-sm mt-1 font-medium">Visualización global de cupos y
-                                    salidas programadas</p>
-                            </div>
-                            <div class="flex gap-3">
-                                {% if not solo_lectura %}
-                                <a href="{% url 'crear_salida' %}"
-                                    class="bg-primary text-white px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-white hover:text-primary transition-all shadow-lg shadow-primary/20">
-                                    Programar Salida
-                                </a>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="p-8">
-                        <div id='calendar-container' class="bg-white rounded-2xl"></div>
-                    </div>
-                    <div
-                        class="p-6 bg-slate-50 border-t border-slate-100 flex flex-wrap gap-6 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        <div class="flex items-center gap-2">
-                            <span class="w-3 h-3 rounded-full bg-primary"></span> DISPONIBLE (>5 CUPOS)
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="w-3 h-3 rounded-full bg-red-500"></span> CRÍTICO (≤5 CUPOS)
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Helpful Tips Card -->
-                <div class="mt-6 bg-blue-50 rounded-xl p-5 border border-blue-100">
-                    <div class="flex gap-3">
-                        <div class="text-blue-500">
-                            <span class="material-icons">info</span>
-                        </div>
-                        <div>
-                            <h4 class="font-bold text-blue-800 text-sm">Consejos para la gestión de tours</h4>
-                            <ul class="mt-2 text-sm text-blue-700 space-y-2">
-                                <li class="flex items-start gap-2">
-                                    <span class="material-icons text-xs">check_circle</span>
-                                    <span>Mantén las descripciones concisas y atractivas para mejorar la
-                                        conversión.</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <span class="material-icons text-xs">check_circle</span>
-                                    <span>Actualiza regularmente los precios según la temporada turística.</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <span class="material-icons text-xs">check_circle</span>
-                                    <span>Configura correctamente los cupos para evitar sobreventa.</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                    {% else %}
+                    <span class="text-xs font-bold text-slate-400">Solo lectura</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="px-6 py-14 text-center text-slate-500">No hay tours registrados.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         </div>
+
+        <div id="calendario" class="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+          <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-extrabold text-slate-900">Calendario de disponibilidad</h3>
+              <p class="text-sm text-slate-500">Vista global de salidas y cupos.</p>
+            </div>
+            {% if not solo_lectura %}
+            <a href="{% url 'crear_salida' %}" class="h-10 px-4 rounded-xl bg-slate-900 text-white text-sm font-bold inline-flex items-center">Programar salida</a>
+            {% endif %}
+          </div>
+          <div class="p-4 sm:p-6">
+            <div id='calendar-container' class="bg-white rounded-2xl"></div>
+          </div>
+        </div>
+      </section>
     </div>
-</main>
+  </div>
+</div>
 
 <style>
-    /* Estilos para mejorar los campos del formulario */
-    input[type="text"],
-    input[type="number"],
-    textarea,
-    select {
-        @apply w-full rounded-xl border border-slate-200 px-4 py-3 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-600;
-    }
-
-    /* Tooltip y efectos de hover */
-    [title] {
-        position: relative;
-        cursor: help;
-    }
-
-    /* Animaciones y transiciones suaves */
-    .form-group {
-        transition: all 0.3s ease;
-    }
-
-    button[type="submit"] {
-        transition: all 0.2s ease;
-    }
-
-    button[type="submit"]:active {
-        transform: scale(0.98);
-    }
-
-    /* Estilo responsive para la tabla */
-    @media (max-width: 768px) {
-        .overflow-x-auto {
-            -webkit-overflow-scrolling: touch;
-        }
-    }
+  input[type="text"], input[type="number"], textarea, select {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: .85rem;
+    padding: .65rem .8rem;
+    font-weight: 600;
+    color: #0f172a;
+    background: #fff;
+  }
+  input[type="text"]:focus, input[type="number"]:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: #0f766e;
+    box-shadow: 0 0 0 3px rgba(15,118,110,.12);
+  }
 </style>
 
 <script>
-    // Función para mostrar detalles del tour
-    function showTourDetails(tourId) {
-        // Aquí podrías implementar un modal o redireccionar a una vista detallada
-        console.log("Ver detalles del tour ID:", tourId);
-        // Ejemplo: window.location.href = `/panel/tour/${tourId}/detalle/`;
-    }
+  document.addEventListener('DOMContentLoaded', function () {
+    var calendarEl = document.getElementById('calendar-container');
+    if (!calendarEl) return;
 
-    // Mejora de la experiencia de usuario en el formulario
-    document.addEventListener('DOMContentLoaded', function () {
-        const formFields = document.querySelectorAll('input, textarea, select');
-
-        formFields.forEach(field => {
-            field.addEventListener('focus', function () {
-                this.closest('.form-group').classList.add('is-focused');
-            });
-
-            field.addEventListener('blur', function () {
-                this.closest('.form-group').classList.remove('is-focused');
-            });
-        });
-
-        // Inicializar FullCalendar
-        var calendarEl = document.getElementById('calendar-container');
-        if (calendarEl) {
-            var calendar = new FullCalendar.Calendar(calendarEl, {
-                locale: 'es',
-                initialView: 'dayGridMonth',
-                headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,timeGridWeek'
-                },
-                events: {{ salidas_json| safe }
-    },
-        eventClick: function (info) {
-            if (info.event.url) {
-                window.location.href = info.event.url;
-                info.jsEvent.preventDefault();
-            }
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+      locale: 'es',
+      initialView: 'dayGridMonth',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek'
+      },
+      events: {{ salidas_json|safe }},
+      eventClick: function (info) {
+        if (info.event.url) {
+          window.location.href = info.event.url;
+          info.jsEvent.preventDefault();
         }
-            });
-    calendar.render();
-        }
+      }
     });
+    calendar.render();
+  });
 </script>
 {% endblock %}

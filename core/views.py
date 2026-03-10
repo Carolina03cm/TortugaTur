@@ -1,4 +1,4 @@
-﻿import json
+import json
 import logging
 import hmac
 import hashlib
@@ -8,18 +8,16 @@ import requests
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib.auth import login, logout, authenticate
-from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth import login, logout
 from django.contrib.auth.models import Group, User
 from django.core.mail import send_mail, EmailMessage, EmailMultiAlternatives
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.utils import timezone
-from django.utils.crypto import get_random_string
 from datetime import timedelta, datetime, time
 from django.http import JsonResponse, HttpResponse
-from django.urls import reverse
+from django.urls import reverse, NoReverseMatch
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.views.decorators.cache import never_cache
@@ -29,6 +27,7 @@ from django.core.paginator import Paginator
 from collections import defaultdict
 import re
 import unicodedata
+from urllib.parse import urlencode
 from .models import Destino, Tour, SalidaTour, Reserva, Pago, Resena, Ticket, EmpresaConfig, Galeria, UserProfile
 from .utils import generar_ticket_pdf, generar_actividad_dia_pdf
 from .forms import DestinoForm, TourForm, RegistroTuristaForm, ContactoForm, TuristaLoginForm, EmpresaConfigForm
@@ -40,16 +39,53 @@ CHILD_PRICE_3_5 = Decimal("35.00")
 CHILD_PRICE_NORMAL = Decimal("70.00")
 GROUP_SECRETARIA = "secretaria"
 GROUP_AGENCIA = "agencia"
+ESTADOS_AGENCIA_VISIBLES = [
+    "solicitud_agencia",
+    "cotizada_agencia",
+    "confirmada_agencia",
+    "pagada_parcial_agencia",
+    "pagada_total_agencia",
+    "rechazada_agencia",
+    "bloqueada_por_agencia",
+]
+ESTADOS_AGENCIA_ACTIVOS = [
+    "solicitud_agencia",
+    "cotizada_agencia",
+    "confirmada_agencia",
+    "pagada_parcial_agencia",
+    "bloqueada_por_agencia",
+]
 
 
-def _precio_nino_por_edad(edad_nino):
+def _filtrar_tours_para_usuario(qs, user):
+    if user and user.is_authenticated and es_agencia(user):
+        return qs.filter(visible_para_agencias=True)
+    return qs
+
+
+def _aplica_descuento_ninos(tour, user=None):
+    if user and user.is_authenticated and es_agencia(user):
+        return bool(getattr(tour, "descuento_ninos_agencia_activo", False))
+    return bool(getattr(tour, "descuento_ninos_activo", True))
+
+
+def _precio_nino_por_edad(edad_nino, tour=None, user=None):
+    if tour is not None and not _aplica_descuento_ninos(tour, user):
+        return tour.precio_adulto_final()
     if edad_nino is None:
         return CHILD_PRICE_NORMAL
+    base_price = None
+    if tour is not None:
+        base_price = tour.precio_nino_final()
+    if not base_price or base_price <= 0:
+        base_price = CHILD_PRICE_NORMAL
+    ratio_0_2 = (CHILD_PRICE_0_2 / CHILD_PRICE_NORMAL)
+    ratio_3_5 = (CHILD_PRICE_3_5 / CHILD_PRICE_NORMAL)
     if edad_nino <= 2:
-        return CHILD_PRICE_0_2
+        return (base_price * ratio_0_2).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     if edad_nino <= 5:
-        return CHILD_PRICE_3_5
-    return CHILD_PRICE_NORMAL
+        return (base_price * ratio_3_5).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return base_price
 
 
 def _calcular_limite_pago_agencia(fecha_salida):
@@ -78,10 +114,11 @@ def _agenda_actividad(reservas, salidas):
     for reserva in reservas:
         if reserva.estado == "cancelada":
             continue
-        fecha_ref = reserva.fecha_reserva.date()
+        fecha_reserva_local = timezone.localtime(reserva.fecha_reserva)
+        fecha_ref = fecha_reserva_local.date()
         agenda[fecha_ref].append({
             "tipo": "reserva",
-            "dt": reserva.fecha_reserva,
+            "dt": fecha_reserva_local,
             "id": reserva.id,
             "titulo": f"{reserva.nombre} {reserva.apellidos}".strip(),
             "tour": reserva.salida.tour.nombre,
@@ -119,9 +156,10 @@ def _secretaria_actividad_dia(user, fecha):
     items = []
     for res in reservas_dia:
         pago_ok = next((p for p in res.pagos.all() if p.estado == "paid"), None)
+        fecha_reserva_local = timezone.localtime(res.fecha_reserva)
         items.append({
             "tipo": "reserva",
-            "dt": res.fecha_reserva,
+            "dt": fecha_reserva_local,
             "id": res.id,
             "titulo": f"{res.nombre} {res.apellidos}".strip(),
             "tour": res.salida.tour.nombre,
@@ -139,10 +177,10 @@ def _secretaria_actividad_dia(user, fecha):
 
 def home(request):
     destinos = Destino.objects.all()
-    tours_destacados = Tour.objects.all()[:3]
+    tours_destacados = _filtrar_tours_para_usuario(Tour.objects.all(), request.user)[:3]
     currency_code, currency_rate = _currency_context(request)
     for tour in tours_destacados:
-        display = _tour_price_display(tour, currency_rate)
+        display = _tour_price_display(tour, currency_rate, request.user)
         tour.precio_adulto_display = display["adulto"]
         tour.precio_nino_display = display["nino"]
 
@@ -160,11 +198,11 @@ def home(request):
     return render(request, "core/home.html", context)
 
 def tours(request):
-    tours = Tour.objects.select_related("destino").all()
+    tours = _filtrar_tours_para_usuario(Tour.objects.select_related("destino").all(), request.user)
     destinos = Destino.objects.all()
     currency_code, currency_rate = _currency_context(request)
     for tour in tours:
-        display = _tour_price_display(tour, currency_rate)
+        display = _tour_price_display(tour, currency_rate, request.user)
         tour.precio_adulto_display = display["adulto"]
         tour.precio_nino_display = display["nino"]
 
@@ -193,6 +231,8 @@ def lista_tours(request):
         fecha=fecha,
         cupos_disponibles__gte=int(personas)
     ).select_related('tour').order_by('hora')
+    if es_agencia(request.user):
+        salidas_brutas = salidas_brutas.filter(tour__visible_para_agencias=True)
 
     ahora = timezone.now()
     fecha_hoy = ahora.date()
@@ -214,7 +254,7 @@ def lista_tours(request):
 
     currency_code, currency_rate = _currency_context(request)
     for tour in tours_con_salidas.keys():
-        display = _tour_price_display(tour, currency_rate)
+        display = _tour_price_display(tour, currency_rate, request.user)
         tour.precio_adulto_display = display["adulto"]
         tour.precio_nino_display = display["nino"]
 
@@ -232,6 +272,9 @@ def lista_tours(request):
 
 def tour_detalle(request, pk):
     tour = get_object_or_404(Tour, pk=pk)
+    if es_agencia(request.user) and not tour.visible_para_agencias:
+        messages.error(request, "Este tour no esta habilitado para agencias.")
+        return redirect("tours")
     horarios_agencia = [h for h in [tour.hora_turno_1, tour.hora_turno_2] if h]
     
     
@@ -265,8 +308,9 @@ def tour_detalle(request, pk):
             telefono = request.POST.get("telefono", "")
             identificacion = request.POST.get("identificacion", "")
             edades_ninos = []
+            aplica_descuento_ninos = _aplica_descuento_ninos(tour, request.user)
 
-            if ninos > 0:
+            if ninos > 0 and aplica_descuento_ninos:
                 if len(edades_ninos_raw) != ninos:
                     error_msg = "Debes ingresar la edad de cada nino."
                     if is_ajax:
@@ -301,6 +345,7 @@ def tour_detalle(request, pk):
             
             fecha_agencia = request.POST.get("fecha_agencia")
             hora_turno_agencia_raw = (request.POST.get("hora_turno_agencia") or "").strip()
+            charter_agencia = (request.POST.get("charter_agencia") == "on")
             hora_turno_agencia = None
             hora_turno_libre = None
 
@@ -415,8 +460,8 @@ def tour_detalle(request, pk):
                 messages.error(request, error_msg)
                 return redirect('tour_detalle', pk=pk)
 
-            # Validar datos obligatorios solo si el usuario estÃ¡ autenticado
-            if request.user.is_authenticated and not all([nombre, telefono, identificacion]):
+            # Validar datos obligatorios solo para flujo normal (no agencias).
+            if request.user.is_authenticated and (not usuario_es_agencia) and not all([nombre, telefono, identificacion]):
                 error_msg = "Completa todos tus datos personales."
                 if is_ajax:
                     return JsonResponse({'error': error_msg}, status=400)
@@ -424,6 +469,19 @@ def tour_detalle(request, pk):
                 return redirect('tour_detalle', pk=pk)
 
             if usuario_es_agencia:
+                if ninos > 0:
+                    error_msg = "Las agencias solo pueden registrar pasajeros adultos o usar charter."
+                    if is_ajax:
+                        return JsonResponse({'error': error_msg}, status=400)
+                    messages.error(request, error_msg)
+                    return redirect('tour_detalle', pk=pk)
+
+                if charter_agencia:
+                    adultos = 16
+                    ninos = 0
+                    edades_ninos = []
+                    total_personas = 16
+
                 if total_personas > 16:
                     error_msg = "Las agencias solo pueden bloquear un máximo de 16 pasajeros por reserva."
                     if is_ajax:
@@ -431,25 +489,27 @@ def tour_detalle(request, pk):
                     messages.error(request, error_msg)
                     return redirect('tour_detalle', pk=pk)
 
-                # Calcular total a pagar (adulto/niÃ±o) referencial
-                precio_adulto = tour.precio_adulto_final()
-                total_ninos = sum(_precio_nino_por_edad(edad) for edad in edades_ninos)
-                total_pagar = (adultos * precio_adulto) + total_ninos
-
-                # Calcular fecha limite dinamica (15 dias o 1 dia antes si la salida es cercana)
-                fecha_limite = _calcular_limite_pago_agencia(fecha_obj)
                 codigo_agencia = request.POST.get("codigo_agencia", "")
-                
-                if not codigo_agencia:
-                    error_msg = "El código de agencia (VOUCHER) es obligatorio."
-                    if is_ajax:
-                        return JsonResponse({'error': error_msg}, status=400)
-                    messages.error(request, error_msg)
-                    return redirect('tour_detalle', pk=pk)
-                    
                 archivo_agencia = request.FILES.get("archivo_agencia")
 
-                # Crear reserva bloqueada y descontar cupos
+                perfil_agencia = getattr(request.user, "perfil", None)
+                nombre_reserva = (
+                    (nombre or "").strip()
+                    or request.user.get_full_name().strip()
+                    or request.user.username
+                )
+                telefono_reserva = (
+                    (telefono or "").strip()
+                    or (getattr(perfil_agencia, "telefono", "") or "").strip()
+                    or "N/A"
+                )
+                identificacion_reserva = (
+                    (identificacion or "").strip()
+                    or (getattr(perfil_agencia, "cedula", "") or "").strip()
+                    or request.user.username
+                )
+
+                # Crear solicitud de bloqueo. Secretaria la acepta/rechaza.
                 with transaction.atomic():
                     salida = SalidaTour.objects.select_for_update().get(id=salida.id)
                     if salida.cupos_disponibles < total_personas:
@@ -460,25 +520,27 @@ def tour_detalle(request, pk):
                         salida=salida,
                         adultos=adultos,
                         ninos=ninos,
-                        total_pagar=total_pagar,
-                        nombre=nombre if nombre else request.user.first_name,
-                        apellidos="",
+                        total_pagar=Decimal("0.00"),
+                        tipo_reserva="agencia",
+                        nombre=nombre_reserva,
+                        apellidos=request.user.last_name or "",
                         correo=request.user.email,
-                        telefono=telefono,
-                        identificacion=identificacion,
-                        estado="bloqueada_por_agencia",
+                        telefono=telefono_reserva,
+                        identificacion=identificacion_reserva,
+                        estado="solicitud_agencia",
                         codigo_agencia=codigo_agencia,
                         archivo_agencia=archivo_agencia,
-                        limite_pago_agencia=fecha_limite,
                         hora_turno_agencia=hora_turno_agencia,
                         hora_turno_libre=hora_turno_libre,
+                        agencia_nombre=request.user.first_name or request.user.username,
+                        agencia_contacto=nombre_reserva,
+                        agencia_telefono=telefono_reserva,
+                        agencia_correo=(request.user.email or "").strip().lower(),
                     )
 
-                    # El turno elegido por agencia queda bloqueado por completo
-                    salida.cupos_disponibles = 0
-                    salida.save(update_fields=["cupos_disponibles"])
+                _notificar_secretarias_solicitud_agencia(reserva)
 
-                msg = "¡Bloqueo exitoso! Tienes la responsabilidad de confirmar o cancelar esta reserva antes de la fecha límite."
+                msg = "Solicitud enviada. Secretaria recibio la notificacion y debe aceptar o rechazar el bloqueo."
                 if is_ajax:
                     return JsonResponse({
                         'success': True,
@@ -493,7 +555,10 @@ def tour_detalle(request, pk):
                 # Flujo normal de Turista
                 # Calcular total a pagar (adulto/niÃ±o)
                 precio_adulto = tour.precio_adulto_final()
-                total_ninos = sum(_precio_nino_por_edad(edad) for edad in edades_ninos)
+                if aplica_descuento_ninos:
+                    total_ninos = sum(_precio_nino_por_edad(edad, tour=tour, user=request.user) for edad in edades_ninos)
+                else:
+                    total_ninos = ninos * precio_adulto
                 total_pagar = (adultos * precio_adulto) + total_ninos
 
                 # Crear la reserva con estado PENDIENTE (hasta que pague)
@@ -503,6 +568,7 @@ def tour_detalle(request, pk):
                     adultos=adultos,
                     ninos=ninos,
                     total_pagar=total_pagar,
+                    tipo_reserva="general",
                     nombre=nombre if nombre else (request.user.first_name if request.user.is_authenticated else ""),
                     apellidos="",  # Puedes agregar este campo al formulario si quieres
                     correo=request.user.email if request.user.is_authenticated else "",
@@ -535,7 +601,7 @@ def tour_detalle(request, pk):
     fotos = tour.fotos.all().order_by('-fecha_agregada')
 
     currency_code, currency_rate = _currency_context(request)
-    price_display = _tour_price_display(tour, currency_rate)
+    price_display = _tour_price_display(tour, currency_rate, request.user)
     precio_adulto = price_display["adulto"]
     precio_nino = price_display["nino"]
 
@@ -576,9 +642,10 @@ def tour_detalle(request, pk):
         "bloqueos_agencia_json": json.dumps({
             f: sorted(list(horas)) for f, horas in bloqueos_agencia_por_fecha.items()
         }),
-        "child_price_0_2": str(CHILD_PRICE_0_2),
-        "child_price_3_5": str(CHILD_PRICE_3_5),
-        "child_price_normal": str(CHILD_PRICE_NORMAL),
+        "child_price_0_2": str(_precio_nino_por_edad(0, tour=tour, user=request.user)),
+        "child_price_3_5": str(_precio_nino_por_edad(4, tour=tour, user=request.user)),
+        "child_price_normal": str(_precio_nino_por_edad(8, tour=tour, user=request.user)),
+        "aplica_descuento_ninos": _aplica_descuento_ninos(tour, request.user),
     })
 
 @login_required
@@ -609,7 +676,20 @@ def crear_resena(request, pk):
 
 def ticket_reserva(request, reserva_id):
     reserva = get_object_or_404(Reserva, id=reserva_id)
-    return render(request, "core/ticket.html", {"reserva": reserva, "empresa": _empresa_config()})
+    es_agencia_ticket = _es_reserva_agencia(reserva)
+    monto_ticket = reserva.total_pagar
+    if es_agencia_ticket and (reserva.monto_pagado_agencia or Decimal("0.00")) > 0:
+        monto_ticket = reserva.monto_pagado_agencia
+    return render(
+        request,
+        "core/ticket.html",
+        {
+            "reserva": reserva,
+            "empresa": _empresa_config(),
+            "monto_ticket": monto_ticket,
+            "es_agencia_ticket": es_agencia_ticket,
+        },
+    )
 
 def ver_ticket_pdf(request, reserva_id):
     reserva = get_object_or_404(Reserva, id=reserva_id)
@@ -640,77 +720,6 @@ def checkout(request, reserva_id=None):
         }
     
     return render(request, 'core/checkout.html', context)
-
-def procesar_pago(request):
-    """Vista para procesar el pago y confirmar la reserva"""
-    if request.method == 'POST':
-        reserva_id = request.POST.get('reserva_id')
-        
-        if not reserva_id:
-            messages.error(request, 'No se encontró la reserva')
-            return redirect('tours')
-        
-        # Obtener los datos del formulario
-        nombre_titular = request.POST.get('nombre_titular')
-        email = request.POST.get('email')
-        numero_tarjeta = request.POST.get('numero_tarjeta')
-        cvv = request.POST.get('cvv')
-        
-        try:
-            reserva = get_object_or_404(Reserva, id=reserva_id)
-            
-            # Verificar que la reserva estÃ© pendiente
-            if reserva.estado != 'pendiente':
-                messages.warning(request, 'Esta reserva ya fue procesada.')
-                return redirect('tours')
-            
-            # AquÃ­ irÃ­a la integraciÃ³n con pasarela de pago real
-            # Por ahora, simulamos que el pago fue exitoso
-            
-            # Actualizar la reserva a PAGADA
-            reserva.estado = 'pagada'
-            if email:
-                reserva.correo = email.strip().lower()
-            reserva.save()
-            
-            # AHORA SÃ descontamos los cupos
-            salida = reserva.salida
-            total_personas = reserva.adultos + reserva.ninos
-            salida.cupos_disponibles -= total_personas
-            salida.save()
-            
-            # Generar y enviar ticket por email
-            try:
-                pdf_buffer = generar_ticket_pdf(reserva, _empresa_config())
-                pdf_content = pdf_buffer.getvalue()
-                pdf_buffer.close()
-                
-                asunto = f"✅ Confirmación de Reserva #{reserva.id:06d} - TortugaTur"
-                mensaje_html = render_to_string("core/email_ticket.html", {"reserva": reserva, "empresa": _empresa_config()})
-                
-                # Enviar al cliente
-                email_cliente = EmailMessage(
-                    subject=asunto,
-                    body=mensaje_html,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    to=[reserva.correo if reserva.correo else email],
-                )
-                email_cliente.content_subtype = "html"
-                email_cliente.attach(f"Ticket_TortugaTur_{reserva.id}.pdf", pdf_content, "application/pdf")
-                email_cliente.send(fail_silently=True)
-                
-            except Exception as e:
-                print(f"Error enviando email: {e}")
-            
-            messages.success(request, '¡Pago procesado exitosamente! Tu reserva ha sido confirmada. Revisa tu email.')
-            return redirect('tours')
-            
-        except Exception as e:
-            messages.error(request, f'Error al procesar el pago: {str(e)}')
-            return redirect('checkout_reserva', reserva_id=reserva_id)
-    
-    messages.error(request, 'Método no permitido')
-    return redirect('tours')
 
 # ============================================
 # PANEL ADMINISTRATIVO
@@ -748,6 +757,48 @@ def _puede_gestionar_checkout(user, reserva):
         return True
     return False
 
+
+def _post_pago_redirect_for_user(user, embed_mode=False):
+    if user and user.is_authenticated:
+        if es_secretaria(user) and not es_admin(user):
+            try:
+                base = reverse("panel_secretaria")
+            except NoReverseMatch:
+                base = "/panel/secretaria/"
+        else:
+            base = reverse("panel_admin")
+    else:
+        base = reverse("home")
+    if embed_mode and base.startswith("/panel/"):
+        return f"{base}?embed=1"
+    return base
+
+
+def _panel_secretaria_url():
+    try:
+        return reverse("panel_secretaria")
+    except NoReverseMatch:
+        return "/panel/secretaria/"
+
+
+def _redir_admin_reservas(request, tipo_default="general"):
+    tipo = (request.POST.get("tipo") or request.GET.get("tipo") or tipo_default or "general").strip().lower()
+    if tipo not in ["general", "agencia"]:
+        tipo = tipo_default if tipo_default in ["general", "agencia"] else "general"
+
+    params = [("tipo", tipo)]
+    fecha = (request.POST.get("fecha") or request.GET.get("fecha") or "").strip()
+    if fecha:
+        params.append(("fecha", fecha))
+
+    if tipo == "agencia":
+        estado_agencia = (request.POST.get("estado_agencia") or request.GET.get("estado_agencia") or "").strip().lower()
+        if estado_agencia in ["activos", "solicitud_agencia", "bloqueada_por_agencia", "pagada_total_agencia"]:
+            params.append(("estado_agencia", estado_agencia))
+
+    base = reverse("admin_reservas")
+    return redirect(f"{base}?{urlencode(params)}")
+
 @login_required
 @user_passes_test(es_admin_o_secretaria)
 def panel_admin(request):
@@ -756,11 +807,14 @@ def panel_admin(request):
     # El admin puede consultar otras fechas desde los modulos de actividad y filtros.
     actividad_fecha = timezone.localdate()
 
+    solicitudes_agencia_pendientes = Reserva.objects.filter(estado="solicitud_agencia").count()
     context = {
         "es_secretaria_panel": es_secretaria(request.user) and not es_admin(request.user),
         "actividad_fecha": actividad_fecha,
         "panel_rol_label": "Administrador" if es_admin(request.user) else "Secretaria",
         "panel_profile_url": "",
+        "panel_workspace_enabled": True,
+        "solicitudes_agencia_pendientes": solicitudes_agencia_pendientes,
     }
     perfil_user = getattr(request.user, "perfil", None)
     if perfil_user and getattr(perfil_user, "foto", None):
@@ -771,7 +825,7 @@ def panel_admin(request):
     ahora = timezone.now()
     hoy = timezone.localdate()
     context["recordatorios_agencia"] = (
-        Reserva.objects.filter(estado="bloqueada_por_agencia", salida__fecha__gte=timezone.localdate())
+        Reserva.objects.filter(estado__in=["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"], salida__fecha__gte=timezone.localdate())
         .select_related("salida__tour", "usuario")
         .order_by("limite_pago_agencia", "salida__fecha", "hora_turno_agencia")[:12]
     )
@@ -790,7 +844,11 @@ def panel_admin(request):
     reservas_hoy = Reserva.objects.filter(fecha_reserva__date=actividad_fecha).exclude(estado="cancelada")
     pagos_hoy = Pago.objects.filter(estado="paid", creado_en__date=actividad_fecha)
     bloqueos_hoy = Reserva.objects.filter(
-        estado="bloqueada_por_agencia",
+        estado__in=["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"],
+        fecha_reserva__date=actividad_fecha,
+    )
+    solicitudes_agencia_hoy = Reserva.objects.filter(
+        estado="solicitud_agencia",
         fecha_reserva__date=actividad_fecha,
     )
     penalizaciones_hoy = Pago.objects.filter(
@@ -800,13 +858,20 @@ def panel_admin(request):
     )
     alertas_operativas = []
     vence_hoy = Reserva.objects.filter(
-        estado="bloqueada_por_agencia",
+        estado__in=["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"],
         limite_pago_agencia__date=actividad_fecha,
     ).count()
     if vence_hoy:
         alertas_operativas.append({
             "titulo": "Bloqueos que vencen hoy",
             "detalle": f"{vence_hoy} reserva(s) de agencia requieren confirmacion hoy.",
+            "enlace": reverse("admin_reservas"),
+            "nivel": "alto",
+        })
+    if solicitudes_agencia_pendientes:
+        alertas_operativas.append({
+            "titulo": "Solicitudes de agencia pendientes",
+            "detalle": f"{solicitudes_agencia_pendientes} solicitud(es) esperan aprobacion de secretaria.",
             "enlace": reverse("admin_reservas"),
             "nivel": "alto",
         })
@@ -828,10 +893,45 @@ def panel_admin(request):
         "reservas_hoy": reservas_hoy.count(),
         "ingresos_hoy": pagos_hoy.aggregate(total=Sum("monto")).get("total") or Decimal("0.00"),
         "bloqueos_hoy": bloqueos_hoy.count(),
+        "solicitudes_agencia_hoy": solicitudes_agencia_hoy.count(),
         "penalizaciones_hoy": penalizaciones_hoy.count(),
     }
     context["alertas_operativas"] = alertas_operativas
+
+    # Notificaciones de agencia visibles para admin y secretaria (campanita superior).
+    bloqueos_qs_global = (
+        Reserva.objects.filter(estado="solicitud_agencia")
+        .select_related("salida__tour")
+        .order_by("-fecha_reserva")[:12]
+    )
+    enlace_agencia = f"{reverse('admin_reservas')}?tipo=agencia"
+    context["notificaciones_bloqueos"] = [
+        {
+            "notif_id": f"bloqueo-{r.id}-{r.estado}",
+            "referencia": f"#{r.id:05d}",
+            "detalle": f"{r.salida.tour.nombre} - {r.nombre} {r.apellidos}".strip(),
+            "enlace": enlace_agencia,
+        }
+        for r in bloqueos_qs_global
+    ]
+    context["notificaciones_secretarias"] = []
     if request.user.is_staff or request.user.is_superuser:
+        fecha_desde_raw = (request.GET.get("fecha_desde") or "").strip()
+        fecha_hasta_raw = (request.GET.get("fecha_hasta") or "").strip()
+        tipo_actividad = (request.GET.get("tipo_actividad") or "todos").strip().lower()
+        secretaria_id = (request.GET.get("secretaria") or "").strip()
+
+        try:
+            fecha_desde = datetime.strptime(fecha_desde_raw, "%Y-%m-%d").date() if fecha_desde_raw else (hoy - timedelta(days=7))
+        except ValueError:
+            fecha_desde = hoy - timedelta(days=7)
+        try:
+            fecha_hasta = datetime.strptime(fecha_hasta_raw, "%Y-%m-%d").date() if fecha_hasta_raw else hoy
+        except ValueError:
+            fecha_hasta = hoy
+        if fecha_desde > fecha_hasta:
+            fecha_desde, fecha_hasta = fecha_hasta, fecha_desde
+
         inicio_mes = hoy.replace(day=1)
         inicio_anio = hoy.replace(month=1, day=1)
         ingresos_total = _resumen_ingresos_reservas().get("total") or Decimal("0.00")
@@ -853,7 +953,271 @@ def panel_admin(request):
             "pasajeros_anio": int(inv_anio.get("adultos") or 0) + int(inv_anio.get("ninos") or 0),
         }
 
+        # KPI estilo SaaS con variacion vs ayer.
+        ayer = hoy - timedelta(days=1)
+        reservas_ayer = Reserva.objects.filter(fecha_reserva__date=ayer).exclude(estado="cancelada").count()
+        ingresos_ayer = (
+            Pago.objects.filter(estado="paid", creado_en__date=ayer).aggregate(total=Sum("monto")).get("total")
+            or Decimal("0.00")
+        )
+        tours_programados_hoy = (
+            SalidaTour.objects.filter(fecha=hoy).values("tour_id").distinct().count()
+        )
+        tours_programados_ayer = (
+            SalidaTour.objects.filter(fecha=ayer).values("tour_id").distinct().count()
+        )
+        salidas_activas_hoy = SalidaTour.objects.filter(fecha__gte=hoy, cupos_disponibles__gt=0).count()
+        salidas_activas_ayer = SalidaTour.objects.filter(fecha__gte=ayer, cupos_disponibles__gt=0).count()
+
+        def _delta(actual, previo):
+            actual_d = Decimal(actual or 0)
+            previo_d = Decimal(previo or 0)
+            if previo_d == 0:
+                if actual_d == 0:
+                    return "0%"
+                return "+100%"
+            cambio = ((actual_d - previo_d) / previo_d) * Decimal("100")
+            pref = "+" if cambio >= 0 else ""
+            return f"{pref}{cambio.quantize(Decimal('0.1'))}%"
+
+        context["dashboard_kpis"] = [
+            {
+                "titulo": "Reservas hoy",
+                "valor": reservas_hoy.count(),
+                "delta": _delta(reservas_hoy.count(), reservas_ayer),
+                "icono": "event_available",
+                "tono": "emerald",
+            },
+            {
+                "titulo": "Ingresos hoy",
+                "valor": f"${(pagos_hoy.aggregate(total=Sum('monto')).get('total') or Decimal('0.00')).quantize(Decimal('0.01'))}",
+                "delta": _delta(pagos_hoy.aggregate(total=Sum("monto")).get("total") or Decimal("0.00"), ingresos_ayer),
+                "icono": "payments",
+                "tono": "teal",
+            },
+            {
+                "titulo": "Tours programados",
+                "valor": tours_programados_hoy,
+                "delta": _delta(tours_programados_hoy, tours_programados_ayer),
+                "icono": "map",
+                "tono": "lime",
+            },
+            {
+                "titulo": "Salidas activas",
+                "valor": salidas_activas_hoy,
+                "delta": _delta(salidas_activas_hoy, salidas_activas_ayer),
+                "icono": "directions_boat",
+                "tono": "slate",
+            },
+        ]
+
+        # Centro de actividad con filtros.
         secretaria_group = Group.objects.filter(name__iexact=GROUP_SECRETARIA).first()
+        secretarias = list(secretaria_group.user_set.filter(is_active=True).order_by("username")) if secretaria_group else []
+        actividad_rows = []
+        reservas_actividad = (
+            Reserva.objects.filter(fecha_reserva__date__range=[fecha_desde, fecha_hasta])
+            .select_related("salida__tour", "creado_por", "gestionada_por")
+            .order_by("-fecha_reserva")
+        )
+        if secretaria_id:
+            reservas_actividad = reservas_actividad.filter(creado_por_id=secretaria_id)
+        reservas_actividad = reservas_actividad[:400]
+
+        for r in reservas_actividad:
+            if tipo_actividad not in ["todos", "reserva", "bloqueo", "cancelacion"]:
+                pass
+            tipo = "bloqueo" if r.estado in ESTADOS_AGENCIA_VISIBLES else "reserva"
+            if r.estado == "cancelada":
+                tipo = "cancelacion"
+            if tipo_actividad != "todos" and tipo_actividad != tipo:
+                continue
+            secretaria_nombre = (
+                r.gestionada_por.username
+                if (tipo == "bloqueo" and r.gestionada_por)
+                else (r.creado_por.username if r.creado_por else "Sistema")
+            )
+            actividad_rows.append({
+                "tipo": tipo,
+                "referencia": f"#{r.id:05d}",
+                "secretaria": secretaria_nombre,
+                "detalle": f"{r.salida.tour.nombre} - {r.nombre} {r.apellidos}".strip(),
+                "estado": r.estado,
+                "hora": r.fecha_reserva,
+                "monto": r.total_pagar,
+            })
+
+        pagos_actividad = (
+            Pago.objects.filter(estado="paid", creado_en__date__range=[fecha_desde, fecha_hasta])
+            .select_related("reserva__salida__tour", "reserva__creado_por")
+            .order_by("-creado_en")
+        )
+        if secretaria_id:
+            pagos_actividad = pagos_actividad.filter(reserva__creado_por_id=secretaria_id)
+        pagos_actividad = pagos_actividad[:300]
+        if tipo_actividad in ["todos", "pago"]:
+            for p in pagos_actividad:
+                actividad_rows.append({
+                    "tipo": "pago",
+                    "referencia": f"PG-{p.id:05d}",
+                    "secretaria": (p.reserva.creado_por.username if p.reserva and p.reserva.creado_por else "Sistema"),
+                    "detalle": f"Pago {p.get_proveedor_display()} - Reserva #{p.reserva_id:05d}",
+                    "estado": "confirmado",
+                    "hora": p.creado_en,
+                    "monto": p.monto,
+                })
+
+        actividad_rows = sorted(actividad_rows, key=lambda x: x["hora"], reverse=True)[:120]
+        context["actividad_rows"] = actividad_rows
+        context["filtros_actividad"] = {
+            "fecha_desde": fecha_desde.isoformat(),
+            "fecha_hasta": fecha_hasta.isoformat(),
+            "tipo_actividad": tipo_actividad,
+            "secretaria": secretaria_id,
+        }
+        context["secretarias_filtro"] = secretarias
+
+        # Reservas del dia.
+        context["reservas_dia_rows"] = list(
+            Reserva.objects.filter(fecha_reserva__date=hoy)
+            .exclude(estado="cancelada")
+            .select_related("salida__tour")
+            .order_by("-fecha_reserva")[:25]
+        )
+
+        # Graficos de operacion.
+        desde_30 = hoy - timedelta(days=29)
+        reservas_30 = (
+            Reserva.objects.filter(fecha_reserva__date__range=[desde_30, hoy])
+            .exclude(estado="cancelada")
+            .values("fecha_reserva__date")
+            .annotate(total=Count("id"))
+        )
+        ingresos_30 = (
+            Pago.objects.filter(estado="paid", creado_en__date__range=[desde_30, hoy])
+            .values("creado_en__date")
+            .annotate(total=Sum("monto"))
+        )
+        map_res = {x["fecha_reserva__date"]: int(x["total"] or 0) for x in reservas_30}
+        map_ing = {x["creado_en__date"]: float(x["total"] or 0) for x in ingresos_30}
+        labels_30 = []
+        data_res_30 = []
+        data_ing_30 = []
+        for i in range(30):
+            f = desde_30 + timedelta(days=i)
+            labels_30.append(f.strftime("%d/%m"))
+            data_res_30.append(map_res.get(f, 0))
+            data_ing_30.append(map_ing.get(f, 0))
+        tours_top = (
+            Reserva.objects.filter(estado="pagada", fecha_reserva__date__range=[desde_30, hoy])
+            .values("salida__tour__nombre")
+            .annotate(total=Count("id"))
+            .order_by("-total")[:6]
+        )
+        ocupacion_tours = (
+            SalidaTour.objects.filter(fecha__gte=hoy)
+            .select_related("tour")
+            .order_by("fecha", "hora")[:8]
+        )
+        ocupacion_labels = []
+        ocupacion_values = []
+        for salida in ocupacion_tours:
+            capacidad = max(int(salida.cupo_maximo or 0), 1)
+            ocupadas = max(capacidad - int(salida.cupos_disponibles or 0), 0)
+            porcentaje = round((ocupadas / capacidad) * 100, 1)
+            ocupacion_labels.append(f"{salida.tour.nombre} {salida.fecha.strftime('%d/%m')}")
+            ocupacion_values.append(porcentaje)
+        context["dashboard_charts"] = {
+            "labels_30": labels_30,
+            "reservas_30": data_res_30,
+            "ingresos_30": data_ing_30,
+            "tours_top_labels": [t["salida__tour__nombre"] for t in tours_top],
+            "tours_top_values": [int(t["total"] or 0) for t in tours_top],
+            "ocupacion_labels": ocupacion_labels,
+            "ocupacion_values": ocupacion_values,
+        }
+        context["dashboard_charts_json"] = json.dumps(context["dashboard_charts"])
+
+        # Notificaciones operativas.
+        notificaciones = []
+        nuevas_reservas = Reserva.objects.filter(fecha_reserva__date=hoy).exclude(estado="cancelada").order_by("-fecha_reserva")[:6]
+        for r in nuevas_reservas:
+            notificaciones.append({
+                "titulo": "Nueva reserva",
+                "detalle": f"#{r.id:05d} {r.salida.tour.nombre}",
+                "nivel": "info",
+                "notif_id": f"reserva-nueva-{r.id}",
+                "enlace": reverse("admin_reservas"),
+                "dt": r.fecha_reserva,
+            })
+        cambios_reserva = Reserva.objects.filter(estado__in=["cancelada"] + ESTADOS_AGENCIA_VISIBLES).order_by("-fecha_reserva")[:8]
+        for r in cambios_reserva:
+            notificaciones.append({
+                "titulo": "Cambio en reserva",
+                "detalle": f"#{r.id:05d} estado {r.estado}",
+                "nivel": "warning" if r.estado != "cancelada" else "danger",
+                "notif_id": f"reserva-cambio-{r.id}-{r.estado}",
+                "enlace": reverse("admin_reservas"),
+                "dt": r.fecha_reserva,
+            })
+        tours_por_llenarse = SalidaTour.objects.filter(fecha__gte=hoy, cupos_disponibles__lte=2).select_related("tour").order_by("fecha", "hora")[:6]
+        for s in tours_por_llenarse:
+            notificaciones.append({
+                "titulo": "Tour por llenarse",
+                "detalle": f"{s.tour.nombre} {s.fecha.strftime('%d/%m')} ({s.cupos_disponibles} cupos)",
+                "nivel": "warning",
+                "notif_id": f"salida-lleno-{s.id}",
+                "enlace": reverse("admin_salidas"),
+                "dt": timezone.make_aware(datetime.combine(s.fecha, s.hora or time.min), timezone.get_current_timezone()),
+            })
+        for idx, a in enumerate(alertas_operativas[:5], start=1):
+            notificaciones.append({
+                "titulo": a["titulo"],
+                "detalle": a["detalle"],
+                "nivel": "danger" if a.get("nivel") == "alto" else "info",
+                "notif_id": f"alerta-{idx}-{(a['titulo'] or '').lower().replace(' ', '-')}",
+                "enlace": a.get("enlace") or reverse("panel_actividad"),
+                "dt": timezone.now(),
+            })
+        context["notificaciones_dashboard"] = sorted(notificaciones, key=lambda x: x["dt"], reverse=True)[:12]
+
+        bloqueos_qs = (
+            Reserva.objects.filter(estado__in=ESTADOS_AGENCIA_VISIBLES)
+            .select_related("salida__tour")
+            .order_by("-fecha_reserva")[:6]
+        )
+        context["notificaciones_bloqueos"] = [
+            {
+                "notif_id": f"bloqueo-{r.id}-{r.estado}",
+                "referencia": f"#{r.id:05d}",
+                "detalle": f"{r.salida.tour.nombre} - {r.nombre} {r.apellidos}".strip(),
+                "enlace": reverse("admin_reservas"),
+            }
+            for r in bloqueos_qs
+        ]
+
+        actividad_secretarias_qs = (
+            Reserva.objects.filter(creado_por__isnull=False)
+            .exclude(estado="cancelada")
+            .select_related("creado_por", "gestionada_por")
+            .order_by("-fecha_reserva")[:8]
+        )
+        context["notificaciones_secretarias"] = [
+            {
+                "notif_id": f"secretaria-{r.id}-{r.estado}",
+                "secretaria": (
+                    r.gestionada_por.username
+                    if (r.estado in ESTADOS_AGENCIA_VISIBLES and r.gestionada_por)
+                    else (r.creado_por.username if r.creado_por else "Sistema")
+                ),
+                "tipo": "bloqueo" if r.estado in ESTADOS_AGENCIA_VISIBLES else "reserva",
+                "referencia": f"#{r.id:05d}",
+                "enlace": reverse("admin_reservas"),
+            }
+            for r in actividad_secretarias_qs
+            if r.creado_por and r.creado_por.username
+        ]
+
         if secretaria_group:
             context["actividad_reservas"] = (
                 Reserva.objects.filter(
@@ -976,7 +1340,11 @@ def panel_admin(request):
             ),
             "bloqueos_hoy": Reserva.objects.filter(
                 creado_por=request.user,
-                estado="bloqueada_por_agencia",
+                estado__in=["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"],
+                fecha_reserva__date=actividad_fecha,
+            ).count(),
+            "solicitudes_agencia_hoy": Reserva.objects.filter(
+                estado="solicitud_agencia",
                 fecha_reserva__date=actividad_fecha,
             ).count(),
             "penalizaciones_hoy": Pago.objects.filter(
@@ -994,8 +1362,65 @@ def panel_admin(request):
                 "nivel": "info",
             }
         ]
+        notificaciones_agencia = list(
+            Reserva.objects.filter(estado__in=ESTADOS_AGENCIA_VISIBLES)
+            .select_related("salida__tour", "usuario")
+            .order_by("-fecha_reserva")[:20]
+        )
+        prioridad_estado = {"solicitud_agencia": 0, "cotizada_agencia": 1, "confirmada_agencia": 2, "pagada_parcial_agencia": 3, "bloqueada_por_agencia": 4}
+        notificaciones_agencia.sort(
+            key=lambda r: (
+                prioridad_estado.get(r.estado, 9),
+                r.salida.fecha if r.salida else timezone.localdate(),
+                r.hora_turno_agencia or time.max,
+            )
+        )
+        for item in notificaciones_agencia:
+            if item.estado == "solicitud_agencia":
+                item.notif_titulo = "Nueva solicitud de bloqueo"
+                item.notif_nivel = "alta"
+                item.notif_estado = "Pendiente de aprobación"
+            elif item.estado == "cotizada_agencia":
+                item.notif_titulo = "Reserva cotizada"
+                item.notif_nivel = "media"
+                item.notif_estado = "Pendiente de confirmacion de agencia"
+            elif item.estado == "confirmada_agencia":
+                item.notif_titulo = "Reserva confirmada"
+                item.notif_nivel = "media"
+                item.notif_estado = "Pendiente de pago"
+            else:
+                item.notif_titulo = "Bloqueo de agencia confirmado"
+                item.notif_nivel = "media"
+                item.notif_estado = "Pendiente de registro de pago"
+        context["notificaciones_agencia_secretaria"] = notificaciones_agencia[:10]
+        context["notificaciones_agencia_total"] = len(notificaciones_agencia)
 
-    return render(request, "core/panel/index.html", context)
+        # Campanita secretaria: mostrar solo nuevas solicitudes de agencia.
+        solicitudes_campana = [r for r in notificaciones_agencia if r.estado == "solicitud_agencia"][:12]
+        context["notificaciones_bloqueos"] = [
+            {
+                "notif_id": f"bloqueo-{r.id}-{r.estado}",
+                "referencia": f"#{r.id:05d}",
+                "detalle": f"{r.salida.tour.nombre} - {r.nombre} {r.apellidos}".strip(),
+                "enlace": f"{reverse('admin_reservas')}?tipo=agencia",
+            }
+            for r in solicitudes_campana
+        ]
+        context["notificaciones_secretarias"] = []
+        context["notificaciones_dashboard"] = [
+            {
+                "notif_id": item["notif_id"],
+                "titulo": "Nueva solicitud de agencia",
+                "detalle": item["detalle"],
+                "enlace": item["enlace"],
+                "dt": timezone.now(),
+            }
+            for item in context["notificaciones_bloqueos"]
+        ]
+
+    # Unificamos admin y secretaria en el mismo dashboard embebido para navegar
+    # dentro del panel sin saltar a vistas externas.
+    return render(request, "core/panel/dashboard_admin.html", context)
 
 
 @login_required
@@ -1064,7 +1489,7 @@ def panel_actividad(request):
         reservas_qs = (
             Reserva.objects.filter(fecha_reserva__date__range=[fecha_desde, fecha_hasta])
             .exclude(estado="cancelada")
-            .select_related("salida__tour", "creado_por", "usuario")
+            .select_related("salida__tour", "creado_por", "gestionada_por", "usuario")
             .prefetch_related("pagos")
         )
         if secretaria_group:
@@ -1095,7 +1520,8 @@ def panel_actividad(request):
                 "monto": res.total_pagar,
                 "metodo_pago": pago_ok.get_proveedor_display() if pago_ok else "Pendiente",
                 "usuario": (
-                    res.creado_por.username if res.creado_por else (res.usuario.username if res.usuario else "web")
+                    (res.gestionada_por.username if (res.estado in ESTADOS_AGENCIA_VISIBLES and res.gestionada_por) else None)
+                    or (res.creado_por.username if res.creado_por else (res.usuario.username if res.usuario else "web"))
                 ),
             })
 
@@ -1194,32 +1620,52 @@ def empresa_config(request):
     return render(request, "core/panel/empresa_config.html", {"form": form})
 
 @login_required
-@user_passes_test(es_admin)
+@user_passes_test(es_admin_o_secretaria)
 def admin_reservas(request):
     _cancelar_reservas_agencia_vencidas()
-    for reserva_estado in Reserva.objects.exclude(estado="pagada").prefetch_related("pagos"):
+    for reserva_estado in Reserva.objects.exclude(estado__in=["pagada", "pagada_total_agencia"]).prefetch_related("pagos"):
         tiene_pago_reserva = any(
             p.estado == "paid" and (p.payload or {}).get("tipo") != "penalizacion_incumplimiento"
             for p in reserva_estado.pagos.all()
         )
         if tiene_pago_reserva:
-            reserva_estado.estado = "pagada"
+            reserva_estado.estado = "pagada_total_agencia" if _es_reserva_agencia(reserva_estado) else "pagada"
             reserva_estado.save(update_fields=["estado"])
-    
-    # Filtros
+
     fecha_filtro = request.GET.get('fecha')
-    
+    tipo_actual = (request.GET.get("tipo") or "general").strip().lower()
+    estado_agencia = (request.GET.get("estado_agencia") or "activos").strip().lower()
+    if tipo_actual not in ["general", "agencia"]:
+        tipo_actual = "general"
+    if estado_agencia not in ["activos", "solicitud_agencia", "bloqueada_por_agencia", "pagada_total_agencia"]:
+        estado_agencia = "activos"
+
     reservas_query = (
         Reserva.objects.select_related("salida__tour")
         .prefetch_related("pagos")
         .exclude(estado="pendiente")
-        .exclude(estado="cancelada")
+        .exclude(estado__in=["cancelada"])
     )
-    
+
     if fecha_filtro:
         reservas_query = reservas_query.filter(salida__fecha=fecha_filtro)
-        
-    reservas = reservas_query.order_by("-id")
+
+    reservas_agencia_base_qs = reservas_query.filter(
+        Q(tipo_reserva="agencia")
+        | Q(estado__in=ESTADOS_AGENCIA_VISIBLES)
+        | Q(codigo_agencia__isnull=False)
+    ).distinct()
+    reservas_agencia_qs = reservas_agencia_base_qs
+    if estado_agencia == "activos":
+        reservas_agencia_qs = reservas_agencia_qs.filter(
+            estado__in=["solicitud_agencia", "bloqueada_por_agencia", "pagada_total_agencia", "pagada"]
+        )
+    else:
+        reservas_agencia_qs = reservas_agencia_qs.filter(estado=estado_agencia)
+    reservas_generales_qs = reservas_query.exclude(id__in=reservas_agencia_base_qs.values("id"))
+
+    reservas = reservas_generales_qs if tipo_actual == "general" else reservas_agencia_qs
+    reservas = reservas.order_by("-id")
 
     hoy = timezone.localdate()
     inicio_mes = hoy.replace(day=1)
@@ -1256,11 +1702,51 @@ def admin_reservas(request):
             reserva.proveedor_pago = pago_exitoso.get_proveedor_display()
         else:
             reserva.proveedor_pago = None
+
+        if reserva.estado == "solicitud_agencia":
+            reserva.estado_mostrar = "pendiente"
+        elif reserva.estado == "cotizada_agencia":
+            reserva.estado_mostrar = "cotizada"
+        elif reserva.estado == "confirmada_agencia":
+            reserva.estado_mostrar = "confirmada"
+        elif reserva.estado == "pagada_parcial_agencia":
+            reserva.estado_mostrar = "pagada parcial"
+        elif reserva.estado in ["pagada_total_agencia", "pagada"] or reserva.tiene_pago:
+            reserva.estado_mostrar = "pagada total"
+        elif reserva.estado == "rechazada_agencia":
+            reserva.estado_mostrar = "rechazada"
+        elif reserva.estado == "bloqueada_por_agencia":
+            reserva.estado_mostrar = "bloqueada agencia"
+        else:
+            reserva.estado_mostrar = reserva.estado
+
+    hoy = timezone.localdate()
+    kpi_agencia = {
+        "solicitudes_pendientes": Reserva.objects.filter(estado="solicitud_agencia").count(),
+        "bloqueadas_sin_pago": Reserva.objects.filter(estado="bloqueada_por_agencia").count(),
+        "pagadas_hoy": Reserva.objects.filter(
+            tipo_reserva="agencia",
+            estado__in=["pagada_total_agencia", "pagada"],
+            fecha_reserva__date=hoy,
+        ).count(),
+        "vencen_hoy": Reserva.objects.filter(
+            estado="bloqueada_por_agencia",
+            limite_pago_agencia__date=hoy,
+        ).count(),
+    }
+
     return render(
         request,
         "core/panel/reservas.html",
         {
             "reservas": reservas,
+            "tipo_actual": tipo_actual,
+            "estado_agencia": estado_agencia,
+            "totales_tab": {
+                "general": reservas_generales_qs.count(),
+                "agencia": reservas_agencia_base_qs.count(),
+            },
+            "kpi_agencia": kpi_agencia,
             "resumen_financiero_reservas": {
                 "ingresos_total": ingresos_total,
                 "ingresos_mes": ingresos_mes,
@@ -1279,7 +1765,7 @@ def cambiar_estado_reserva(request, reserva_id):
             messages.error(request, "Las reservas de agencia no se pueden modificar manualmente desde admin.")
             return redirect("admin_reservas")
         nuevo_estado = request.POST.get("estado")
-        if nuevo_estado in ["pendiente", "confirmada", "cancelada", "pagada", "bloqueada_por_agencia"]:
+        if nuevo_estado in ["pendiente", "confirmada", "cancelada", "pagada"]:
             estado_anterior = reserva.estado
             if nuevo_estado == "confirmada":
                 nuevo_estado = "pagada"
@@ -1371,7 +1857,6 @@ def crear_agencia(request):
             "cedula": cedula,
             "tipo": "nueva",
         }
-        messages.success(request, f"Agencia creada. Usuario: {username} | Clave temporal (cédula): {password}")
     except Exception as e:
         messages.error(request, f"Ocurrio un error al crear la agencia: {e}")
 
@@ -1454,6 +1939,97 @@ def eliminar_reserva(request, reserva_id):
     reserva.delete()
     messages.success(request, f"Reserva #{reserva_id} de {nombre} eliminada correctamente.")
     return redirect("admin_reservas")
+
+
+@login_required
+@user_passes_test(es_admin_o_secretaria)
+@require_POST
+def gestionar_solicitud_agencia(request, reserva_id):
+    reserva = get_object_or_404(Reserva.objects.select_related("salida__tour"), id=reserva_id)
+    if not _es_reserva_agencia(reserva):
+        messages.error(request, "La reserva seleccionada no corresponde a una agencia.")
+        return _redir_admin_reservas(request, "agencia")
+    accion = (request.POST.get("accion") or "").strip().lower()
+    if accion not in ["aceptar", "rechazar"]:
+        messages.error(request, "Accion invalida.")
+        return _redir_admin_reservas(request, "agencia")
+
+    if accion == "rechazar":
+        if reserva.estado != "solicitud_agencia":
+            messages.warning(request, "Solo puedes rechazar solicitudes pendientes.")
+            return _redir_admin_reservas(request, "agencia")
+        reserva.estado = "cancelada"
+        reserva.gestionada_por = request.user
+        reserva.save(update_fields=["estado", "gestionada_por"])
+        _recalcular_disponibilidad_salida(reserva.salida)
+        messages.success(request, f"Solicitud de agencia #{reserva.id:06d} rechazada.")
+        return _redir_admin_reservas(request, "agencia")
+
+    with transaction.atomic():
+        reserva = Reserva.objects.select_for_update().select_related("salida").get(id=reserva.id)
+        salida = SalidaTour.objects.select_for_update().get(id=reserva.salida_id)
+        if reserva.estado != "solicitud_agencia":
+            messages.warning(request, "La solicitud ya fue procesada por otro usuario.")
+            return _redir_admin_reservas(request, "agencia")
+
+        total_personas = reserva.adultos + reserva.ninos
+        if total_personas > 16:
+            messages.error(request, "Las solicitudes de agencia no pueden superar 16 pasajeros.")
+            return _redir_admin_reservas(request, "agencia")
+        if salida.cupos_disponibles < total_personas:
+            messages.error(request, "No hay cupos disponibles para aceptar este bloqueo.")
+            return _redir_admin_reservas(request, "agencia")
+
+        reserva.estado = "bloqueada_por_agencia"
+        reserva.tipo_reserva = "agencia"
+        reserva.limite_pago_agencia = _calcular_limite_pago_agencia(salida.fecha)
+        reserva.gestionada_por = request.user
+        reserva.save(update_fields=["estado", "tipo_reserva", "limite_pago_agencia", "gestionada_por"])
+        salida.cupos_disponibles = 0
+        salida.save(update_fields=["cupos_disponibles"])
+
+    messages.success(request, f"Solicitud de agencia #{reserva.id:06d} aceptada y bloqueada.")
+    return _redir_admin_reservas(request, "agencia")
+
+
+@login_required
+@user_passes_test(es_admin_o_secretaria)
+@require_POST
+def registrar_pago_agencia(request, reserva_id):
+    reserva = get_object_or_404(Reserva.objects.select_related("salida"), id=reserva_id)
+    if not _es_reserva_agencia(reserva):
+        messages.error(request, "La reserva seleccionada no corresponde a una agencia.")
+        return _redir_admin_reservas(request, "agencia")
+    if reserva.estado != "bloqueada_por_agencia":
+        messages.error(request, "Solo puedes registrar pago en reservas de agencia bloqueadas.")
+        return _redir_admin_reservas(request, "agencia")
+
+    monto_pagado = _parse_decimal(request.POST.get("monto_pagado"))
+    if monto_pagado is None or monto_pagado <= 0:
+        messages.error(request, "Ingresa un monto pagado valido mayor a 0.")
+        return _redir_admin_reservas(request, "agencia")
+
+    reserva.total_pagar = monto_pagado
+    reserva.monto_pagado_agencia = monto_pagado
+    reserva.tipo_reserva = "agencia"
+    reserva.gestionada_por = request.user
+    reserva.save(update_fields=["total_pagar", "monto_pagado_agencia", "tipo_reserva", "gestionada_por"])
+    try:
+        _mark_reserva_paid(
+            reserva.id,
+            "efectivo",
+            payload={
+                "tipo": "pago_agencia_manual",
+                "registrado_por": request.user.username,
+                "monto_registrado": str(monto_pagado),
+            },
+        )
+    except ValueError as e:
+        messages.error(request, str(e))
+        return _redir_admin_reservas(request, "agencia")
+
+    messages.success(request, f"Pago de agencia registrado en reserva #{reserva.id:06d} por ${monto_pagado}.")
+    return _redir_admin_reservas(request, "agencia")
 
 @login_required
 @user_passes_test(es_admin_o_secretaria)
@@ -1711,33 +2287,30 @@ def registro(request):
 
 @never_cache
 def vista_login(request):
-    """Maneja el inicio de sesiÃ³n y la redirecciÃ³n al tour original."""
+    """Maneja el inicio de sesion y la redireccion al tour original."""
     if request.user.is_authenticated:
-        perfil = getattr(request.user, "perfil", None)
-        if perfil and getattr(perfil, "force_password_change", False):
-            return redirect("perfil_admin")
-        if es_admin_o_secretaria(request.user):
+        if request.user.is_staff or request.user.is_superuser:
             return redirect("panel_admin")
+        if es_secretaria(request.user):
+            return redirect(_panel_secretaria_url())
         return redirect("home")
 
     next_url = request.GET.get('next', 'home')
-    
+
     if request.method == 'POST':
         form = TuristaLoginForm(data=request.POST)
         if form.is_valid():
             user = form.get_user()
             login(request, user)
-            messages.success(request, f"¡Qué bueno verte de nuevo, {user.first_name}!")
-            perfil = getattr(user, "perfil", None)
-            if perfil and getattr(perfil, "force_password_change", False):
-                messages.warning(request, "Debes cambiar tu contraseña temporal antes de continuar.")
-                return redirect("perfil_admin")
-            if es_admin_o_secretaria(user):
+            messages.success(request, f"Que bueno verte de nuevo, {user.first_name}!")
+            if user.is_staff or user.is_superuser:
                 return redirect("panel_admin")
+            if es_secretaria(user):
+                return redirect(_panel_secretaria_url())
             return redirect(request.POST.get('next', 'home'))
     else:
         form = TuristaLoginForm()
-    
+
     return render(request, 'registration/login.html', {
         'form': form,
         'next': next_url
@@ -1753,18 +2326,480 @@ def vista_logout(request):
 from django.contrib.auth.decorators import login_required
 
 @login_required
+def panel_inicio(request):
+    if es_secretaria(request.user) and not es_admin(request.user):
+        return redirect(_panel_secretaria_url())
+    if not (request.user.is_staff or request.user.is_superuser):
+        return redirect("home")
+
+    hoy = timezone.localdate()
+    fecha_desde_raw = (request.GET.get("fecha_desde") or "").strip()
+    fecha_hasta_raw = (request.GET.get("fecha_hasta") or "").strip()
+    estado_filtro = (request.GET.get("estado") or "todos").strip().lower()
+    estados_validos = {"todos", "pendiente", "pagada", "cancelada", "solicitud_agencia", "bloqueada_por_agencia"}
+    if estado_filtro not in estados_validos:
+        estado_filtro = "todos"
+
+    try:
+        fecha_desde = datetime.strptime(fecha_desde_raw, "%Y-%m-%d").date() if fecha_desde_raw else (hoy - timedelta(days=29))
+    except ValueError:
+        fecha_desde = hoy - timedelta(days=29)
+    try:
+        fecha_hasta = datetime.strptime(fecha_hasta_raw, "%Y-%m-%d").date() if fecha_hasta_raw else hoy
+    except ValueError:
+        fecha_hasta = hoy
+    if fecha_desde > fecha_hasta:
+        fecha_desde, fecha_hasta = fecha_hasta, fecha_desde
+    if (fecha_hasta - fecha_desde).days > 62:
+        fecha_desde = fecha_hasta - timedelta(days=62)
+
+    pendientes_agencia = Reserva.objects.filter(estado="solicitud_agencia").count()
+    salidas_con_pocos_cupos = SalidaTour.objects.filter(fecha__gte=hoy, cupos_disponibles__lte=3).count()
+    actividad_base = (
+        Reserva.objects.select_related("salida__tour")
+        .filter(fecha_reserva__date__range=[fecha_desde, fecha_hasta])
+        .order_by("-fecha_reserva")
+    )
+    if estado_filtro != "todos":
+        actividad_base = actividad_base.filter(estado=estado_filtro)
+    nuevas_reservas = actividad_base[:12]
+
+    reservas_chart_qs = Reserva.objects.filter(fecha_reserva__date__range=[fecha_desde, fecha_hasta])
+    if estado_filtro != "todos":
+        reservas_chart_qs = reservas_chart_qs.filter(estado=estado_filtro)
+    else:
+        reservas_chart_qs = reservas_chart_qs.exclude(estado="cancelada")
+    reservas_chart = reservas_chart_qs.values("fecha_reserva__date").annotate(total=Count("id"))
+    reservas_map = {r["fecha_reserva__date"]: int(r["total"] or 0) for r in reservas_chart}
+
+    pagos_chart = (
+        Pago.objects.filter(estado="paid", creado_en__date__range=[fecha_desde, fecha_hasta])
+        .values("creado_en__date")
+        .annotate(total=Sum("monto"))
+    )
+    pagos_map = {p["creado_en__date"]: float(p["total"] or 0) for p in pagos_chart}
+    labels = []
+    data_reservas = []
+    data_ingresos = []
+    dias = (fecha_hasta - fecha_desde).days + 1
+    for i in range(max(dias, 1)):
+        d = fecha_desde + timedelta(days=i)
+        labels.append(d.strftime("%d/%m"))
+        data_reservas.append(reservas_map.get(d, 0))
+        data_ingresos.append(pagos_map.get(d, 0))
+
+    notificaciones = []
+    for r in nuevas_reservas[:5]:
+        notificaciones.append({
+            "notif_id": f"reserva-{r.id}-{r.estado}",
+            "titulo": f"Reserva #{r.id:05d}",
+            "detalle": (r.salida.tour.nombre if r.salida and r.salida.tour else "Reserva nueva"),
+            "fecha": r.fecha_reserva,
+            "url": f"{reverse('admin_reservas')}?tipo=general",
+        })
+    if pendientes_agencia:
+        notificaciones.insert(0, {
+            "notif_id": f"agencia-pendiente-{pendientes_agencia}",
+            "titulo": "Solicitudes de agencia",
+            "detalle": f"{pendientes_agencia} pendientes por revisar",
+            "fecha": timezone.now(),
+            "url": f"{reverse('admin_reservas')}?tipo=agencia",
+        })
+
+    inicio_mes = hoy.replace(day=1)
+    inicio_anio = hoy.replace(month=1, day=1)
+    ingresos_total = Pago.objects.filter(estado="paid").aggregate(total=Sum("monto")).get("total") or Decimal("0.00")
+    ingresos_mes = (
+        Pago.objects.filter(estado="paid", creado_en__date__gte=inicio_mes)
+        .aggregate(total=Sum("monto"))
+        .get("total")
+        or Decimal("0.00")
+    )
+
+    reservas_mes_qs = Reserva.objects.filter(fecha_reserva__date__gte=inicio_mes).exclude(estado="cancelada")
+    reservas_anio_qs = Reserva.objects.filter(fecha_reserva__date__gte=inicio_anio).exclude(estado="cancelada")
+    inv_mes = reservas_mes_qs.aggregate(adultos=Sum("adultos"), ninos=Sum("ninos"))
+    inv_anio = reservas_anio_qs.aggregate(adultos=Sum("adultos"), ninos=Sum("ninos"))
+
+    recordatorios_agencia = (
+        Reserva.objects.filter(
+            estado__in=["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"],
+            salida__fecha__gte=hoy,
+        )
+        .select_related("salida__tour")
+        .order_by("limite_pago_agencia", "salida__fecha")[:6]
+    )
+
+    actividad_secretarias = []
+    for r in nuevas_reservas[:6]:
+        actividad_secretarias.append({
+            "tipo": "reserva creada" if r.estado not in ESTADOS_AGENCIA_VISIBLES else "bloqueo aplicado",
+            "detalle": f"{r.salida.tour.nombre if r.salida and r.salida.tour else 'Tour'} - #{r.id:05d}",
+            "hora": timezone.localtime(r.fecha_reserva),
+        })
+
+    tour_top_row = (
+        Reserva.objects.exclude(estado="cancelada")
+        .values("salida__tour__nombre")
+        .annotate(total=Count("id"), pasajeros=Sum("adultos") + Sum("ninos"))
+        .order_by("-total")
+        .first()
+    )
+    tour_mas_vendido = {
+        "nombre": (tour_top_row or {}).get("salida__tour__nombre") or "Sin datos",
+        "reservas": int((tour_top_row or {}).get("total") or 0),
+        "pasajeros": int((tour_top_row or {}).get("pasajeros") or 0),
+    }
+
+    cliente_top_row = (
+        Reserva.objects.filter(tipo_reserva="general")
+        .exclude(estado="cancelada")
+        .values("nombre", "apellidos")
+        .annotate(total=Count("id"))
+        .order_by("-total")
+        .first()
+    )
+    cliente_fiel = {
+        "nombre": (
+            f"{(cliente_top_row or {}).get('nombre', '')} {(cliente_top_row or {}).get('apellidos', '')}".strip()
+            or "Sin datos"
+        ),
+        "reservas": int((cliente_top_row or {}).get("total") or 0),
+    }
+
+    agencia_top_row = (
+        Reserva.objects.filter(tipo_reserva="agencia")
+        .exclude(estado__in=["cancelada", "rechazada_agencia"])
+        .exclude(agencia_nombre="")
+        .values("agencia_nombre")
+        .annotate(total=Count("id"))
+        .order_by("-total")
+        .first()
+    )
+    agencia_fiel = {
+        "nombre": (agencia_top_row or {}).get("agencia_nombre") or "Sin datos",
+        "reservas": int((agencia_top_row or {}).get("total") or 0),
+    }
+
+    context = {
+        "admin_nombre": request.user.get_full_name() or request.user.username,
+        "rol": "Administrador",
+        "kpi_usuarios": User.objects.filter(is_active=True).count(),
+        "kpi_tours": Tour.objects.count(),
+        "kpi_reservas_hoy": Reserva.objects.filter(fecha_reserva__date=hoy).count(),
+        "kpi_ingresos_hoy": Pago.objects.filter(estado="paid", creado_en__date=hoy).aggregate(total=Sum("monto")).get("total") or Decimal("0.00"),
+        "kpi_pendientes_agencia": pendientes_agencia,
+        "kpi_salidas_alerta": salidas_con_pocos_cupos,
+        "kpi_penalizaciones_hoy": Pago.objects.filter(
+            estado__in=["created", "approved"],
+            payload__tipo="penalizacion_incumplimiento",
+            creado_en__date=hoy,
+        ).count(),
+        "notificaciones": notificaciones[:6],
+        "actividad_reciente": nuevas_reservas[:6],
+        "resumen_financiero": {
+            "ingresos_total": ingresos_total,
+            "ingresos_mes": ingresos_mes,
+            "reservas_mes": reservas_mes_qs.count(),
+            "reservas_anio": reservas_anio_qs.count(),
+            "pasajeros_mes": int(inv_mes.get("adultos") or 0) + int(inv_mes.get("ninos") or 0),
+            "pasajeros_anio": int(inv_anio.get("adultos") or 0) + int(inv_anio.get("ninos") or 0),
+        },
+        "recordatorios_agencia": recordatorios_agencia,
+        "actividad_secretarias": actividad_secretarias,
+        "tour_mas_vendido": tour_mas_vendido,
+        "cliente_fiel": cliente_fiel,
+        "agencia_fiel": agencia_fiel,
+        "filtros": {
+            "fecha_desde": fecha_desde.isoformat(),
+            "fecha_hasta": fecha_hasta.isoformat(),
+            "estado": estado_filtro,
+        },
+        "dashboard_charts_json": json.dumps({
+            "labels": labels,
+            "reservas": data_reservas,
+            "ingresos": data_ingresos,
+        }),
+    }
+    return render(request, "core/panel/index.html", context)
+
+
+@login_required
+@user_passes_test(es_staff_o_secretaria)
+def panel_secretaria(request):
+    if es_admin(request.user):
+        return redirect("panel_admin")
+
+    _cancelar_reservas_agencia_vencidas()
+    hoy = timezone.localdate()
+    inicio_mes = hoy.replace(day=1)
+
+    reservas_hoy_qs = (
+        Reserva.objects.filter(creado_por=request.user, fecha_reserva__date=hoy)
+        .exclude(estado="cancelada")
+        .select_related("salida__tour")
+    )
+    reservas_mes_qs = (
+        Reserva.objects.filter(creado_por=request.user, fecha_reserva__date__gte=inicio_mes)
+        .exclude(estado="cancelada")
+    )
+    reservas_agencia_hoy_qs = reservas_hoy_qs.filter(
+        Q(tipo_reserva="agencia") | Q(estado__in=ESTADOS_AGENCIA_VISIBLES)
+    )
+    pagos_hoy = (
+        Pago.objects.filter(
+            estado="paid",
+            reserva__creado_por=request.user,
+            creado_en__date=hoy,
+        ).aggregate(total=Sum("monto")).get("total")
+        or Decimal("0.00")
+    )
+    salidas_hoy = SalidaTour.objects.filter(fecha=hoy).count()
+    salidas_proximas = (
+        SalidaTour.objects.filter(fecha__gte=hoy)
+        .select_related("tour")
+        .order_by("fecha", "hora")[:8]
+    )
+
+    actividad_hoy = _secretaria_actividad_dia(request.user, hoy)[:10]
+    bloqueos_agencia_qs = (
+        Reserva.objects.filter(estado="solicitud_agencia")
+        .select_related("salida__tour")
+        .order_by("-fecha_reserva")
+    )
+    solicitudes_agencia_pendientes = bloqueos_agencia_qs.count()
+    notificaciones_bloqueos = []
+    for r in bloqueos_agencia_qs[:8]:
+        notificaciones_bloqueos.append({
+            "notif_id": f"agencia-bloqueo-{r.id}",
+            "titulo": f"Bloqueo agencia #{r.id:05d}",
+            "detalle": (r.salida.tour.nombre if r.salida and r.salida.tour else "Solicitud de bloqueo"),
+            "fecha": timezone.localtime(r.fecha_reserva),
+            "url": f"{reverse('admin_reservas')}?tipo=agencia&estado_agencia=solicitud_agencia",
+        })
+
+    agencias_panel_qs = (
+        Reserva.objects.filter(
+            Q(tipo_reserva="agencia")
+            | Q(estado__in=ESTADOS_AGENCIA_VISIBLES)
+            | ~Q(agencia_nombre="")
+        )
+        .exclude(estado="cancelada")
+        .select_related("salida__tour", "gestionada_por")
+        .prefetch_related("pagos")
+        .order_by("-fecha_reserva")[:20]
+    )
+    agencias_panel_rows = []
+    for r in agencias_panel_qs:
+        tiene_pago = any(p.estado == "paid" for p in r.pagos.all())
+        agencias_panel_rows.append({
+            "id": r.id,
+            "agencia_nombre": r.agencia_nombre or f"{r.nombre} {r.apellidos}".strip(),
+            "tour_nombre": (r.salida.tour.nombre if r.salida and r.salida.tour else "-"),
+            "monto": r.total_pagar,
+            "monto_pagado_agencia": r.monto_pagado_agencia,
+            "estado": r.estado,
+            "tiene_pago": tiene_pago,
+            "gestiona": (r.gestionada_por.username if r.gestionada_por else ""),
+            "limite_pago_agencia": r.limite_pago_agencia,
+        })
+
+    context = {
+        "secretaria_nombre": request.user.get_full_name() or request.user.username,
+        "hoy": hoy,
+        "kpis": {
+            "reservas_hoy": reservas_hoy_qs.count(),
+            "reservas_mes": reservas_mes_qs.count(),
+            "agencias_hoy": reservas_agencia_hoy_qs.count(),
+            "ingresos_hoy": pagos_hoy,
+            "salidas_hoy": salidas_hoy,
+            "solicitudes_agencia_pendientes": solicitudes_agencia_pendientes,
+        },
+        "salidas_proximas": salidas_proximas,
+        "actividad_hoy": actividad_hoy,
+        "notificaciones_bloqueos": notificaciones_bloqueos,
+        "agencias_panel_rows": agencias_panel_rows,
+    }
+    return render(request, "core/panel/dashboard_secretaria.html", context)
+
+
+@login_required
+@user_passes_test(es_staff_o_secretaria)
+def panel_notificaciones_secretaria_json(request):
+    if es_admin(request.user):
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
+    bloqueos_qs = (
+        Reserva.objects.filter(estado="solicitud_agencia")
+        .select_related("salida__tour")
+        .order_by("-fecha_reserva")[:12]
+    )
+    notificaciones = []
+    for r in bloqueos_qs:
+        notificaciones.append({
+            "notif_id": f"agencia-bloqueo-{r.id}",
+            "titulo": f"Bloqueo agencia #{r.id:05d}",
+            "detalle": (r.salida.tour.nombre if r.salida and r.salida.tour else "Solicitud de bloqueo"),
+            "fecha": timezone.localtime(r.fecha_reserva).strftime("%d/%m/%Y %I:%M %p"),
+            "url": f"{reverse('admin_reservas')}?tipo=agencia&estado_agencia=solicitud_agencia",
+        })
+
+    return JsonResponse({
+        "ok": True,
+        "notificaciones": notificaciones,
+        "generated_at": timezone.localtime(timezone.now()).strftime("%d/%m/%Y %I:%M %p"),
+    })
+
+
+@login_required
+def panel_notificaciones_json(request):
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
+    pendientes_agencia = Reserva.objects.filter(estado="solicitud_agencia").count()
+    nuevas_reservas = (
+        Reserva.objects.select_related("salida__tour")
+        .exclude(estado="cancelada")
+        .order_by("-fecha_reserva")[:6]
+    )
+    notificaciones = []
+    for r in nuevas_reservas[:5]:
+        notificaciones.append({
+            "notif_id": f"reserva-{r.id}-{r.estado}",
+            "titulo": f"Reserva #{r.id:05d}",
+            "detalle": (r.salida.tour.nombre if r.salida and r.salida.tour else "Reserva nueva"),
+            "fecha": timezone.localtime(r.fecha_reserva).strftime("%d/%m/%Y %I:%M %p"),
+            "url": f"{reverse('admin_reservas')}?tipo=general",
+        })
+    if pendientes_agencia:
+        notificaciones.insert(0, {
+            "notif_id": f"agencia-pendiente-{pendientes_agencia}",
+            "titulo": "Solicitudes de agencia",
+            "detalle": f"{pendientes_agencia} pendientes por revisar",
+            "fecha": timezone.localtime(timezone.now()).strftime("%d/%m/%Y %I:%M %p"),
+            "url": f"{reverse('admin_reservas')}?tipo=agencia",
+        })
+
+    return JsonResponse({
+        "ok": True,
+        "notificaciones": notificaciones[:10],
+        "generated_at": timezone.localtime(timezone.now()).strftime("%d/%m/%Y %I:%M %p"),
+    })
+
+
+@login_required
+@user_passes_test(es_admin)
+def descargar_reporte_rango_pdf(request):
+    fecha_desde_raw = (request.GET.get("fecha_desde") or "").strip()
+    fecha_hasta_raw = (request.GET.get("fecha_hasta") or "").strip()
+    estado_filtro = (request.GET.get("estado") or "todos").strip().lower()
+    segmento = (request.GET.get("segmento") or "todos").strip().lower()
+    estados_validos = {"todos", "pendiente", "pagada", "cancelada", "solicitud_agencia", "bloqueada_por_agencia"}
+    segmentos_validos = {"todos", "usuarios", "secretarias", "agencias"}
+    if estado_filtro not in estados_validos:
+        estado_filtro = "todos"
+    if segmento not in segmentos_validos:
+        segmento = "todos"
+
+    hoy = timezone.localdate()
+    try:
+        fecha_desde = datetime.strptime(fecha_desde_raw, "%Y-%m-%d").date() if fecha_desde_raw else (hoy - timedelta(days=29))
+    except ValueError:
+        fecha_desde = hoy - timedelta(days=29)
+    try:
+        fecha_hasta = datetime.strptime(fecha_hasta_raw, "%Y-%m-%d").date() if fecha_hasta_raw else hoy
+    except ValueError:
+        fecha_hasta = hoy
+    if fecha_desde > fecha_hasta:
+        fecha_desde, fecha_hasta = fecha_hasta, fecha_desde
+    if (fecha_hasta - fecha_desde).days > 62:
+        fecha_desde = fecha_hasta - timedelta(days=62)
+
+    pagos = (
+        Pago.objects.filter(
+            estado="paid",
+            creado_en__date__range=[fecha_desde, fecha_hasta],
+        )
+        .select_related("reserva__salida__tour", "reserva__creado_por", "reserva__usuario")
+        .order_by("-creado_en")
+    )
+    if estado_filtro != "todos":
+        pagos = pagos.filter(reserva__estado=estado_filtro)
+
+    if segmento == "usuarios":
+        pagos = pagos.filter(reserva__tipo_reserva="general", reserva__usuario__isnull=False)
+    elif segmento == "secretarias":
+        secretaria_group = Group.objects.filter(name__iexact=GROUP_SECRETARIA).first()
+        if secretaria_group:
+            secretarias_ids = secretaria_group.user_set.values_list("id", flat=True)
+            pagos = pagos.filter(reserva__creado_por_id__in=secretarias_ids)
+        else:
+            pagos = pagos.none()
+    elif segmento == "agencias":
+        pagos = pagos.filter(
+            Q(reserva__tipo_reserva="agencia")
+            | ~Q(reserva__agencia_nombre="")
+            | Q(reserva__estado__in=ESTADOS_AGENCIA_VISIBLES)
+        )
+
+    items = []
+    for pago in pagos:
+        res = pago.reserva
+        if res and res.creado_por:
+            autor = res.creado_por.username
+        elif res and res.usuario:
+            autor = res.usuario.username
+        else:
+            autor = "web"
+        items.append({
+            "tipo": "pago",
+            "dt": pago.creado_en,
+            "id": pago.id,
+            "titulo": f"{res.nombre} {res.apellidos}".strip() if res else "-",
+            "tour": (res.salida.tour.nombre if res and res.salida and res.salida.tour else "-"),
+            "estado": "paid",
+            "monto": pago.monto,
+            "usuario": autor,
+        })
+
+    resumen = {
+        "total_registros": len(items),
+        "total_ventas": sum(((item["monto"] or Decimal("0.00")) for item in items), Decimal("0.00")),
+    }
+    segmento_label = {
+        "todos": "todos",
+        "usuarios": "usuarios",
+        "secretarias": "secretarias",
+        "agencias": "agencias",
+    }.get(segmento, "todos")
+    titulo = (
+        f"Reporte operativo del {fecha_desde.strftime('%d/%m/%Y')} al {fecha_hasta.strftime('%d/%m/%Y')} "
+        f"(estado: {estado_filtro}, segmento: {segmento_label})"
+    )
+    buffer = generar_actividad_dia_pdf(titulo, fecha_hasta, items, resumen, _empresa_config())
+    response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+    response["Content-Disposition"] = (
+        f'attachment; filename="reporte_{segmento_label}_{fecha_desde.strftime("%Y%m%d")}_{fecha_hasta.strftime("%Y%m%d")}.pdf"'
+    )
+    return response
+
+@login_required
 def mis_reservas(request):
     """Vista para que el turista vea su historial de compras/reservas."""
     _cancelar_reservas_agencia_vencidas()
     reservas = list(
-        Reserva.objects.filter(usuario=request.user).exclude(estado="pendiente").order_by('-fecha_reserva')
+        Reserva.objects.filter(usuario=request.user)
+        .exclude(estado__in=["pendiente", "cancelada"])
+        .order_by('-fecha_reserva')
     )
-    ahora = timezone.now()
     for reserva in reservas:
         reserva.puede_cancelar_agencia = False
-        if _es_reserva_agencia(reserva) and reserva.estado == "bloqueada_por_agencia":
-            if reserva.limite_pago_agencia and reserva.limite_pago_agencia > ahora:
-                reserva.puede_cancelar_agencia = True
+        if (
+            _es_reserva_agencia(reserva)
+            and reserva.estado == "solicitud_agencia"
+            and not reserva.gestionada_por_id
+        ):
+            reserva.puede_cancelar_agencia = True
     return render(request, 'core/mis_reservas.html', {'reservas': reservas})
 
 
@@ -1776,17 +2811,18 @@ def cancelar_reserva_agencia(request, reserva_id):
     if not _es_reserva_agencia(reserva):
         messages.error(request, "Esta reserva no corresponde a una agencia.")
         return redirect("mis_reservas")
-    if reserva.estado != "bloqueada_por_agencia":
-        messages.error(request, "Solo puedes cancelar reservas bloqueadas por agencia.")
+    if reserva.gestionada_por_id:
+        messages.error(request, "La solicitud ya fue gestionada por secretaria y no puede cancelarse.")
         return redirect("mis_reservas")
-    if reserva.limite_pago_agencia and reserva.limite_pago_agencia <= timezone.now():
-        messages.error(request, "El plazo ya vencio. Esta reserva ya no puede cancelarse manualmente.")
+    if reserva.estado != "solicitud_agencia":
+        messages.error(request, "Solo puedes cancelar solicitudes de agencia antes de ser aceptadas.")
         return redirect("mis_reservas")
 
-    reserva.estado = "cancelada"
-    reserva.save(update_fields=["estado"])
-    _recalcular_disponibilidad_salida(reserva.salida)
-    messages.success(request, f"Reserva #{reserva.id:06d} cancelada por la agencia antes del plazo.")
+    salida_ref = reserva.salida
+    reserva_ref = reserva.id
+    reserva.delete()
+    _recalcular_disponibilidad_salida(salida_ref)
+    messages.success(request, f"Reserva #{reserva_ref:06d} cancelada y removida del historial.")
     return redirect("mis_reservas")
 
 # ============================================
@@ -1860,9 +2896,9 @@ def _currency_context(request):
     rate = Decimal(str(rates.get(code, 1)))
     return code, rate
 
-def _tour_price_display(tour, currency_rate):
+def _tour_price_display(tour, currency_rate, user=None):
     precio_adulto = tour.precio_adulto_final()
-    precio_nino = tour.precio_nino_final()
+    precio_nino = tour.precio_nino_final() if _aplica_descuento_ninos(tour, user) else precio_adulto
     return {
         "adulto": precio_adulto * currency_rate,
         "nino": precio_nino * currency_rate,
@@ -1900,8 +2936,11 @@ def _amount_minor_units(amount):
 def _recalcular_disponibilidad_salida(salida):
     """Recalcula cupos en base a reservas activas y bloqueo exclusivo de agencia."""
     hay_bloqueo_agencia = (
-        Reserva.objects.filter(salida=salida, hora_turno_agencia__isnull=False)
-        .exclude(estado="cancelada")
+        Reserva.objects.filter(
+            salida=salida,
+            hora_turno_agencia__isnull=False,
+            estado__in=ESTADOS_AGENCIA_ACTIVOS,
+        )
         .exists()
     )
     if hay_bloqueo_agencia:
@@ -1910,7 +2949,10 @@ def _recalcular_disponibilidad_salida(salida):
         return
 
     ocupados = (
-        Reserva.objects.filter(salida=salida, estado__in=["pagada", "confirmada", "bloqueada_por_agencia"])
+        Reserva.objects.filter(
+            salida=salida,
+            estado__in=["pagada", "confirmada", "pagada_total_agencia"] + ESTADOS_AGENCIA_ACTIVOS,
+        )
         .aggregate(total_adultos=Sum("adultos"), total_ninos=Sum("ninos"))
     )
     total_ocupados = int(ocupados.get("total_adultos") or 0) + int(ocupados.get("total_ninos") or 0)
@@ -1929,9 +2971,11 @@ def _penalizacion_pendiente_agencia(user):
 
 
 def _es_reserva_agencia(reserva):
+    if getattr(reserva, "tipo_reserva", "") == "agencia":
+        return True
     if reserva.codigo_agencia or reserva.hora_turno_agencia:
         return True
-    if reserva.estado == "bloqueada_por_agencia":
+    if reserva.estado in ESTADOS_AGENCIA_VISIBLES:
         return True
     if reserva.usuario and es_agencia(reserva.usuario):
         return True
@@ -2005,13 +3049,55 @@ def _enviar_alerta_correo_agencia_24h(reserva):
         return False
 
 
+def _notificar_secretarias_solicitud_agencia(reserva):
+    group_secretaria = Group.objects.filter(name__iexact=GROUP_SECRETARIA).first()
+    correos_secretarias = []
+    if group_secretaria:
+        correos_secretarias = [
+            (u.email or "").strip().lower()
+            for u in group_secretaria.user_set.filter(is_active=True)
+            if (u.email or "").strip()
+        ]
+
+    correo_admin = (getattr(settings, "AGENCIA_EMAIL", "") or "").strip().lower()
+    destinatarios = sorted(set(correos_secretarias + ([correo_admin] if correo_admin else [])))
+    if not destinatarios:
+        return False
+
+    turno = reserva.hora_turno_agencia.strftime("%I:%M %p") if reserva.hora_turno_agencia else "Sin turno"
+    subject = f"Nueva solicitud de agencia #{reserva.id:06d}"
+    body = (
+        "Se registro una nueva solicitud de bloqueo por agencia.\n\n"
+        f"Reserva: #{reserva.id:06d}\n"
+        f"Agencia: {reserva.usuario.username if reserva.usuario else 'N/A'}\n"
+        f"Tour: {reserva.salida.tour.nombre}\n"
+        f"Fecha salida: {reserva.salida.fecha.strftime('%Y-%m-%d')}\n"
+        f"Turno: {turno}\n"
+        f"Pasajeros: {reserva.total_personas()}\n"
+        f"Codigo agencia: {reserva.codigo_agencia or 'No registrado'}\n\n"
+        "Ingresa al panel de reservas para aceptar o rechazar la solicitud."
+    )
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=destinatarios,
+            fail_silently=False,
+        )
+        return True
+    except Exception:
+        logger.exception("No se pudo enviar notificacion a secretaria para reserva %s", reserva.id)
+        return False
+
+
 def _cancelar_reservas_agencia_vencidas():
     ahora = timezone.now()
     tz = timezone.get_current_timezone()
 
     # Normaliza reservas existentes: el limite nunca puede pasar de 1 dia antes de la salida.
     reservas_bloqueadas = (
-        Reserva.objects.filter(estado="bloqueada_por_agencia")
+        Reserva.objects.filter(estado__in=["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"])
         .select_related("salida")
     )
     for reserva in reservas_bloqueadas:
@@ -2032,7 +3118,7 @@ def _cancelar_reservas_agencia_vencidas():
     # Alerta automatica por correo cuando faltan menos de 24h.
     por_vencer_24h = (
         Reserva.objects.filter(
-            estado="bloqueada_por_agencia",
+            estado__in=["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"],
             limite_pago_agencia__isnull=False,
             limite_pago_agencia__gt=ahora,
             limite_pago_agencia__lte=ahora + timedelta(hours=24),
@@ -2047,7 +3133,7 @@ def _cancelar_reservas_agencia_vencidas():
 
     vencidas = (
         Reserva.objects.filter(
-            estado="bloqueada_por_agencia",
+            estado__in=["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"],
             limite_pago_agencia__isnull=False,
             limite_pago_agencia__lt=ahora,
         )
@@ -2080,6 +3166,7 @@ def _limpiar_historial_canceladas_agencia_diario():
     filtros_agencia = (
         (Q(codigo_agencia__isnull=False) & ~Q(codigo_agencia=""))
         | Q(hora_turno_agencia__isnull=False)
+        | Q(tipo_reserva="agencia")
         | Q(usuario__groups__name=GROUP_AGENCIA)
     )
     (
@@ -2092,33 +3179,54 @@ def _limpiar_historial_canceladas_agencia_diario():
 
 def _send_ticket_email(reserva):
     try:
+        def _clean_email(value):
+            email = (value or "").strip().lower()
+            return email if "@" in email else ""
+
         pdf_buffer = generar_ticket_pdf(reserva, _empresa_config())
         pdf_content = pdf_buffer.getvalue()
         pdf_buffer.close()
         subject = f"Confirmacion de Reserva #{reserva.id:06d} - TortugaTur"
+        es_agencia_ticket = _es_reserva_agencia(reserva)
+        monto_ticket = reserva.total_pagar
+        if es_agencia_ticket and (reserva.monto_pagado_agencia or Decimal("0.00")) > 0:
+            monto_ticket = reserva.monto_pagado_agencia
         html_body = render_to_string(
             "core/email_ticket.html",
             {
                 "reserva": reserva,
+                "monto_ticket": monto_ticket,
+                "es_agencia_ticket": es_agencia_ticket,
                 "empresa": _empresa_config(),
                 "site_url": _site_url(request=None),
                 "whatsapp_number": getattr(settings, "WHATSAPP_NUMBER", ""),
                 "agencia_email": getattr(settings, "AGENCIA_EMAIL", ""),
             },
         )
-        recipient = reserva.correo or (reserva.usuario.email if reserva.usuario else "")
+        recipients = []
+        for candidate in [
+            _clean_email(getattr(reserva, "correo", "")),
+            _clean_email(getattr(getattr(reserva, "usuario", None), "email", "")),
+            _clean_email(getattr(reserva, "agencia_correo", "")),
+        ]:
+            if candidate and candidate not in recipients:
+                recipients.append(candidate)
+
         agencia_email = getattr(settings, "AGENCIA_EMAIL", "")
-        if not recipient and not agencia_email:
+        if not recipients and not _clean_email(agencia_email):
             return
 
-        to_list = [recipient] if recipient else []
-        bcc_list = [agencia_email] if agencia_email and agencia_email != recipient else []
+        to_list = recipients[:] if recipients else []
+        agencia_email_clean = _clean_email(agencia_email)
+        bcc_list = []
+        if agencia_email_clean and agencia_email_clean not in to_list:
+            bcc_list.append(agencia_email_clean)
 
         email_cliente = EmailMessage(
             subject=subject,
             body=html_body,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            to=to_list or [agencia_email],
+            to=to_list or [agencia_email_clean],
             bcc=bcc_list,
         )
         email_cliente.content_subtype = "html"
@@ -2149,7 +3257,7 @@ def _mark_reserva_paid(reserva_id, proveedor, external_id="", payload=None):
         reserva = Reserva.objects.select_for_update().select_related("salida").get(id=reserva_id)
         salida = SalidaTour.objects.select_for_update().get(id=reserva.salida_id)
         if (
-            reserva.estado == "bloqueada_por_agencia"
+            reserva.estado in ["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"]
             and reserva.limite_pago_agencia
             and reserva.limite_pago_agencia < timezone.now()
         ):
@@ -2174,7 +3282,7 @@ def _mark_reserva_paid(reserva_id, proveedor, external_id="", payload=None):
                 .first()
             )
 
-        if reserva.estado == "pagada":
+        if reserva.estado in ["pagada", "pagada_total_agencia"]:
             if customer_email and reserva.correo != customer_email:
                 reserva.correo = customer_email
                 reserva.save(update_fields=["correo"])
@@ -2192,18 +3300,18 @@ def _mark_reserva_paid(reserva_id, proveedor, external_id="", payload=None):
 
         personas = reserva.adultos + reserva.ninos
         # IMPORTANTE: No restar cupos si ya se restaron cuando la agencia bloqueÃ³
-        if estado_anterior != "bloqueada_por_agencia":
+        if estado_anterior not in ["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"]:
             if salida.cupos_disponibles < personas:
                 raise ValueError("No hay cupos suficientes al confirmar el pago.")
 
-        reserva.estado = "pagada"
+        reserva.estado = "pagada_total_agencia" if _es_reserva_agencia(reserva) else "pagada"
         if customer_email:
             reserva.correo = customer_email
             reserva.save(update_fields=["estado", "correo"])
         else:
             reserva.save(update_fields=["estado"])
 
-        if estado_anterior != "bloqueada_por_agencia":
+        if estado_anterior not in ["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"]:
             salida.cupos_disponibles -= personas
             salida.save(update_fields=["cupos_disponibles"])
 
@@ -2229,7 +3337,7 @@ def _mark_reserva_paid(reserva_id, proveedor, external_id="", payload=None):
     _send_ticket_email(reserva)
     
     # Enviar correo adicional confirmando que el valor bloqueado fue cancelado si era agencia
-    if estado_anterior == "bloqueada_por_agencia" and reserva.usuario and reserva.usuario.email:
+    if estado_anterior in ["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"] and reserva.usuario and reserva.usuario.email:
         from django.core.mail import send_mail
         from django.template.loader import render_to_string
         subject = f"Confirmación de Pago a Agencia - Reserva #{reserva.id:06d}"
@@ -2326,14 +3434,13 @@ def checkout_pago(request, reserva_id):
     if not _puede_gestionar_checkout(request.user, reserva):
         messages.error(request, "No tienes permiso para acceder a este checkout.")
         return redirect("home")
+    if _es_reserva_agencia(reserva):
+        messages.info(request, "Las reservas de agencia no manejan pago en linea.")
+        return redirect("mis_reservas")
     embed_mode = (request.GET.get("embed") == "1")
     if reserva.estado == "pagada":
         messages.success(request, "Pago confirmado. Tu reserva ya esta pagada.")
-        if embed_mode:
-            if es_secretaria(request.user) and not es_admin(request.user):
-                return redirect(f"{reverse('secretaria_reservar')}?embed=1")
-            return redirect(f"{reverse('admin_reservas')}?embed=1")
-        return redirect("home")
+        return redirect(_post_pago_redirect_for_user(request.user, embed_mode=embed_mode))
 
     context = {
         "reserva": reserva,
@@ -2352,10 +3459,14 @@ def checkout_pago(request, reserva_id):
 @login_required
 def create_lemonsqueezy_checkout(request, reserva_id):
     _cancelar_reservas_agencia_vencidas()
+    embed_mode = (request.GET.get("embed") == "1") or (request.POST.get("embed") == "1")
     reserva = get_object_or_404(Reserva, id=reserva_id)
     if not _puede_gestionar_checkout(request.user, reserva):
         messages.error(request, "No tienes permiso para iniciar este pago.")
         return redirect("home")
+    if _es_reserva_agencia(reserva):
+        messages.error(request, "Las reservas de agencia no manejan checkout en linea.")
+        return redirect("mis_reservas")
     if reserva.estado not in ["pendiente", "bloqueada_por_agencia"]:
         messages.warning(request, "Esta reserva ya no esta pendiente de pago.")
         return redirect("tours")
@@ -2383,9 +3494,9 @@ def create_lemonsqueezy_checkout(request, reserva_id):
                     "embed": False,
                 },
                 "product_options": {
-                    "redirect_url": f"{site_url}{reverse('home')}?pago=ok",
+                    "redirect_url": f"{site_url}{_post_pago_redirect_for_user(request.user, embed_mode=embed_mode)}",
                     "receipt_button_text": "Volver a TortugaTur",
-                    "receipt_link_url": f"{site_url}{reverse('home')}",
+                    "receipt_link_url": f"{site_url}{_post_pago_redirect_for_user(request.user, embed_mode=embed_mode)}",
                 },
             },
             "relationships": {
@@ -2455,6 +3566,8 @@ def create_paypal_order(request, reserva_id):
     reserva = get_object_or_404(Reserva, id=reserva_id)
     if not _puede_gestionar_checkout(request.user, reserva):
         return JsonResponse({"error": "No autorizado para esta reserva."}, status=403)
+    if _es_reserva_agencia(reserva):
+        return JsonResponse({"error": "Las reservas de agencia no manejan pago en linea."}, status=400)
     if reserva.estado not in ["pendiente", "bloqueada_por_agencia"]:
         return JsonResponse({"error": "La reserva ya no esta pendiente de pago."}, status=400)
 
@@ -2535,7 +3648,7 @@ def capture_paypal_order(request, reserva_id):
     except ValueError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
 
-    return JsonResponse({"ok": True, "redirect_url": reverse("home")})
+    return JsonResponse({"ok": True, "redirect_url": _post_pago_redirect_for_user(request.user, embed_mode=embed_mode)})
 
 
 @csrf_exempt
@@ -2777,6 +3890,15 @@ def _parse_int(value, default=0):
         return default
 
 
+def _parse_decimal(value):
+    raw = (value or "").strip().replace(",", ".")
+    try:
+        parsed = Decimal(raw)
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+    return parsed.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
 def _slug_login_base(texto, fallback="usuario"):
     raw = (texto or "").strip().lower()
     if not raw:
@@ -2802,8 +3924,6 @@ def _username_unico(base):
         idx += 1
 
 
-def _password_temporal():
-    return get_random_string(10, allowed_chars="abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789")
 
 
 def _username_secretaria_base(first_name, last_name):
@@ -2935,7 +4055,8 @@ def secretaria_reservar(request):
             correo = f"sin-correo-reserva-{timezone.now().strftime('%Y%m%d%H%M%S')}@tortugatur.local"
 
         edades_ninos = []
-        if ninos > 0:
+        aplica_descuento_ninos = _aplica_descuento_ninos(salida.tour, request.user)
+        if ninos > 0 and aplica_descuento_ninos:
             if len(edades_ninos_raw) != ninos:
                 messages.error(request, "Debes ingresar la edad de cada nino.")
                 return _redir_secretaria_reservar()
@@ -2948,8 +4069,12 @@ def secretaria_reservar(request):
                 messages.error(request, "La edad del nino no puede ser negativa.")
                 return _redir_secretaria_reservar()
 
-        total_ninos = sum(_precio_nino_por_edad(edad) for edad in edades_ninos)
-        total_pagar = (adultos * salida.tour.precio_adulto_final()) + total_ninos
+        precio_adulto = salida.tour.precio_adulto_final()
+        if aplica_descuento_ninos:
+            total_ninos = sum(_precio_nino_por_edad(edad, tour=salida.tour, user=request.user) for edad in edades_ninos)
+        else:
+            total_ninos = ninos * precio_adulto
+        total_pagar = (adultos * precio_adulto) + total_ninos
         reserva = Reserva.objects.create(
             usuario=None,
             salida=salida,
@@ -2991,10 +4116,20 @@ def secretaria_reservar(request):
 
     for tour in todos_los_tours:
         tour.imagen_portada = portada_map.get(tour.id, "")
+    def _attach_child_prices(t):
+        t.child_price_0_2 = _precio_nino_por_edad(0, tour=t, user=request.user)
+        t.child_price_3_5 = _precio_nino_por_edad(4, tour=t, user=request.user)
+        t.child_price_normal = _precio_nino_por_edad(8, tour=t, user=request.user)
+        t.aplica_descuento_ninos = _aplica_descuento_ninos(t, request.user)
+
+    for tour in todos_los_tours:
+        _attach_child_prices(tour)
     for tour in list(tours_con_salidas.keys()):
         tour.imagen_portada = portada_map.get(tour.id, "")
+        _attach_child_prices(tour)
     for tour in list(tours_reserva_directa.keys()):
         tour.imagen_portada = portada_map.get(tour.id, "")
+        _attach_child_prices(tour)
 
     return render(
         request,
@@ -3008,9 +4143,6 @@ def secretaria_reservar(request):
             "fecha_busqueda": fecha,
             "fecha_busqueda_display": fecha_display,
             "destino_seleccionado": destino_seleccionado,
-            "child_price_0_2": str(CHILD_PRICE_0_2),
-            "child_price_3_5": str(CHILD_PRICE_3_5),
-            "child_price_normal": str(CHILD_PRICE_NORMAL),
             "fecha_hoy_iso": fecha_hoy.isoformat(),
         },
     )
@@ -3022,6 +4154,9 @@ def procesar_pago_efectivo(request, reserva_id):
     _cancelar_reservas_agencia_vencidas()
     embed_mode = (request.POST.get("embed") == "1") or (request.GET.get("embed") == "1")
     reserva = get_object_or_404(Reserva, id=reserva_id)
+    if _es_reserva_agencia(reserva):
+        messages.error(request, "Las reservas de agencia no manejan cobro en checkout.")
+        return redirect("admin_reservas")
     if reserva.estado == "pagada":
         messages.warning(request, "La reserva ya está pagada.")
         if embed_mode:
@@ -3057,21 +4192,39 @@ def cancelar_reserva_checkout(request, reserva_id):
     # Permisos: admin, secretaria que la creó, o usuario dueño de la reserva.
     es_dueno_turista = bool(reserva.usuario_id and reserva.usuario_id == request.user.id)
     es_dueno_secretaria = bool(reserva.creado_por_id and reserva.creado_por_id == request.user.id)
-    if not (es_admin(request.user) or es_dueno_turista or es_dueno_secretaria):
-        messages.error(request, "No tienes permiso para cancelar esta reserva.")
+
+    def _redir_cancel():
         if embed_mode:
             if es_secretaria(request.user) and not es_admin(request.user):
                 return redirect(f"{reverse('secretaria_reservar')}?embed=1")
             return redirect(f"{reverse('admin_reservas')}?embed=1")
+        if es_secretaria(request.user) and not es_admin(request.user):
+            return redirect("secretaria_reservar")
+        if es_admin(request.user):
+            return redirect("admin_reservas")
+        if es_dueno_turista:
+            return redirect("mis_reservas")
         return redirect("home")
+
+    if not (es_admin(request.user) or es_dueno_turista or es_dueno_secretaria):
+        messages.error(request, "No tienes permiso para cancelar esta reserva.")
+        return _redir_cancel()
 
     if reserva.estado == "pagada":
         messages.error(request, "No se puede cancelar una reserva ya pagada.")
-        if embed_mode:
-            if es_secretaria(request.user) and not es_admin(request.user):
-                return redirect(f"{reverse('secretaria_reservar')}?embed=1")
-            return redirect(f"{reverse('admin_reservas')}?embed=1")
+        return _redir_cancel()
+
+    if _es_reserva_agencia(reserva) and not es_admin_o_secretaria(request.user):
+        messages.error(request, "Esta reserva de agencia no puede cancelarse por este medio.")
         return redirect("mis_reservas")
+
+    if es_dueno_turista and not es_admin_o_secretaria(request.user):
+        salida_ref = reserva.salida
+        reserva_ref = reserva.id
+        reserva.delete()
+        _recalcular_disponibilidad_salida(salida_ref)
+        messages.success(request, f"Reserva #{reserva_ref:06d} cancelada y removida del historial.")
+        return _redir_cancel()
 
     if reserva.estado != "cancelada":
         reserva.estado = "cancelada"
@@ -3079,13 +4232,7 @@ def cancelar_reserva_checkout(request, reserva_id):
         _recalcular_disponibilidad_salida(reserva.salida)
 
     messages.success(request, f"Reserva #{reserva.id:06d} cancelada correctamente.")
-    if embed_mode:
-        if es_secretaria(request.user) and not es_admin(request.user):
-            return redirect(f"{reverse('secretaria_reservar')}?embed=1")
-        return redirect(f"{reverse('admin_reservas')}?embed=1")
-    if es_dueno_turista:
-        return redirect("mis_reservas")
-    return redirect("home")
+    return _redir_cancel()
 
 @login_required
 @user_passes_test(es_admin)
@@ -3132,7 +4279,6 @@ def admin_secretarias(request):
             "cedula": cedula,
             "tipo": "nueva",
         }
-        messages.success(request, f"Secretaria creada. Usuario: {username} | Clave temporal (cédula): {password}")
         return redirect("admin_secretarias")
 
     secretarias = group_secretaria.user_set.all().order_by("username")
@@ -3212,7 +4358,6 @@ def reset_secretaria_password(request, user_id):
         "cedula": perfil.cedula,
         "tipo": "reset",
     }
-    messages.success(request, f"Contraseña temporal (cédula) para '{secretaria.username}': {new_password}")
     return redirect("admin_secretarias")
 
 
@@ -3257,6 +4402,7 @@ def reset_agencia_password(request, user_id):
         "cedula": perfil.cedula,
         "tipo": "reset",
     }
-    messages.success(request, f"Contraseña temporal (cédula) para agencia '{agencia.username}': {new_password}")
     return _redir_agencias(to_top=True)
+
+
 

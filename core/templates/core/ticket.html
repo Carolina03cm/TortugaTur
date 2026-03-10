@@ -99,7 +99,10 @@
 
                 <div>
                     <p class="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Monto Total</p>
-                    <p class="text-primary font-black text-xl">$ {{ reserva.total_pagar }} USD</p>
+                    <p class="text-primary font-black text-xl">$ {{ monto_ticket|default:reserva.total_pagar }} USD</p>
+                    {% if es_agencia_ticket %}
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Monto manual de agencia</p>
+                    {% endif %}
                 </div>
 
             </div>

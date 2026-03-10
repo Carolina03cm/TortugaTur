@@ -105,7 +105,10 @@
                 <p class="value">{{ reserva.adultos }} Adulto(s){% if reserva.ninos %}, {{ reserva.ninos }} Nino(s){% endif %}</p>
 
                 <p class="label" style="margin-top:12px;">Total pagado</p>
-                <p class="value" style="font-size:18px;">${{ reserva.total_pagar }}</p>
+                <p class="value" style="font-size:18px;">${{ monto_ticket|default:reserva.total_pagar }}</p>
+                {% if es_agencia_ticket %}
+                <p style="margin:6px 0 0 0; color:#64748b; font-size:12px;">Monto registrado manualmente por secretaria.</p>
+                {% endif %}
             </div>
 
             <p>Adjuntamos tu <strong>voucher oficial</strong> en PDF. Presentalo al momento del check-in.</p>

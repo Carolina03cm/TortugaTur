@@ -1,144 +1,128 @@
-{% extends "core/base.html" %}
+﻿{% extends "core/base.html" %}
+{% block title %}Destinos | TortugaTur{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-6 py-10 bg-slate-50 min-h-screen">
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
-        <div class="flex items-center gap-4">
-            <div class="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
-                <span class="material-icons">map</span>
-            </div>
-            <h1 class="text-3xl font-black text-slate-900 tracking-tight">Gestión de <span class="text-primary">Destinos</span></h1>
+<div class="min-h-screen bg-slate-100 py-8">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+
+    <section class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <p class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Catalogo</p>
+          <h1 class="text-3xl font-black text-slate-900">Gestion de Destinos</h1>
+          <p class="text-sm text-slate-500 mt-1">Administra destinos disponibles para los tours.</p>
         </div>
-        
-        <a href="{% url 'panel_admin' %}"
-           class="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white border border-slate-200 text-slate-600 hover:text-primary hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 font-bold text-sm">
-            <span class="material-icons text-base">arrow_back</span>
-            Volver al Panel
+        <a href="{% url 'panel_admin' %}" class="h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-bold inline-flex items-center gap-2 hover:border-slate-300 w-max">
+          <span class="material-icons text-[18px]">arrow_back</span>Panel
         </a>
-    </div>
-    
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        <div class="lg:col-span-1">
-            {% if solo_lectura %}
-            <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 mb-4 text-sm font-semibold">
-                Modo solo lectura para secretaria. Puedes consultar destinos, pero no crear, editar ni eliminar.
-            </div>
-            {% endif %}
-            {% if not solo_lectura %}
-            <div class="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 sticky top-10">
-                <h2 class="text-xl font-black text-slate-800 mb-6 flex items-center gap-2">
-                    <span class="material-icons text-primary">add_location_alt</span>
-                    Añadir Nuevo
-                </h2>
-                <form method="post" class="space-y-4">
-                    {% csrf_token %}
-                    <div class="django-form-container">
-                        {{ form.as_p }}
-                    </div>
-                    <button type="submit" class="w-full bg-slate-900 text-white font-black px-6 py-4 rounded-2xl mt-4 hover:bg-primary transition-all active:scale-95 shadow-lg shadow-primary/20 flex items-center justify-center gap-2 uppercase text-xs tracking-widest">
-                        <span class="material-icons text-sm">save</span> Guardar Destino
-                    </button>
-                </form>
-            </div>
-            {% endif %}
-        </div>
+      </div>
+    </section>
 
-        <div class="lg:col-span-2">
-            <div class="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden">
-                <table class="w-full text-left border-collapse">
-                    <thead class="bg-slate-900 text-white text-[10px] uppercase tracking-[0.2em]">
-                        <tr>
-                            <th class="px-8 py-6">Nombre del Destino</th>
-                            <th class="px-8 py-6 text-center">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-50">
-                        {% for destino in destinos %}
-                        <tr class="group hover:bg-slate-50/80 transition-all duration-300">
-                            <td class="px-8 py-5">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-all">
-                                        <span class="material-icons text-sm">location_on</span>
-                                    </div>
-                                    <span class="font-bold text-slate-700 group-hover:text-slate-900 transition-colors">{{ destino.nombre }}</span>
-                                </div>
-                            </td>
-                            <td class="px-8 py-5">
-                                <div class="flex items-center justify-center gap-3">
-                                    {% if not solo_lectura %}
-                                    <a href="{% url 'editar_destino' destino.id %}" 
-                                       class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-all" 
-                                       title="Editar">
-                                        <span class="material-icons text-lg">edit</span>
-                                    </a>
-
-                                    <form action="{% url 'eliminar_destino' destino.id %}" method="post" onsubmit="return confirmDelete('{{ destino.nombre }}')" class="inline">
-                                        {% csrf_token %}
-                                        <button type="submit" 
-                                                class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all" 
-                                                title="Eliminar">
-                                            <span class="material-icons text-lg">delete_outline</span>
-                                        </button>
-                                    </form>
-                                    {% else %}
-                                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Solo lectura</span>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="2" class="px-8 py-24 text-center">
-                                <div class="flex flex-col items-center">
-                                    <span class="material-icons text-6xl text-slate-100 mb-4">map</span>
-                                    <p class="text-slate-400 font-bold">No hay destinos registrados aún.</p>
-                                    <p class="text-slate-300 text-sm">Comienza agregando uno en el panel de la izquierda.</p>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <section class="xl:col-span-1 space-y-4">
+        {% if solo_lectura %}
+        <div class="rounded-2xl border border-amber-200 bg-amber-50 text-amber-800 px-4 py-3 text-sm font-semibold">
+          Modo solo lectura. Puedes consultar destinos, pero no crear ni editar.
         </div>
+        {% endif %}
+
+        {% if not solo_lectura %}
+        <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+          <h2 class="text-lg font-extrabold text-slate-900 mb-4">Nuevo destino</h2>
+          <form method="post" class="space-y-4">
+            {% csrf_token %}
+            <div class="django-form-container">{{ form.as_p }}</div>
+            <button type="submit" class="w-full h-11 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800">Guardar destino</button>
+          </form>
+        </div>
+        {% endif %}
+      </section>
+
+      <section class="xl:col-span-2 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+          <h3 class="text-lg font-extrabold text-slate-900">Listado de destinos</h3>
+          <span class="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-700">{{ destinos|length }} registros</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-950 text-white text-[10px] uppercase tracking-[0.16em]">
+              <tr>
+                <th class="px-6 py-4 text-left">Destino</th>
+                <th class="px-6 py-4 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for destino in destinos %}
+              <tr class="hover:bg-slate-50">
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-3">
+                    <span class="h-9 w-9 rounded-lg bg-slate-100 text-slate-600 inline-flex items-center justify-center"><span class="material-icons text-[18px]">place</span></span>
+                    <span class="font-bold text-slate-900">{{ destino.nombre }}</span>
+                  </div>
+                </td>
+                <td class="px-6 py-4 text-right">
+                  {% if not solo_lectura %}
+                  <div class="inline-flex items-center gap-2">
+                    <a href="{% url 'editar_destino' destino.id %}" class="h-9 w-9 rounded-lg bg-slate-100 text-slate-600 inline-flex items-center justify-center hover:bg-blue-50 hover:text-blue-600" title="Editar">
+                      <span class="material-icons text-[18px]">edit</span>
+                    </a>
+                    <form action="{% url 'eliminar_destino' destino.id %}" method="post" class="inline" onsubmit="return confirmDelete('{{ destino.nombre }}')">
+                      {% csrf_token %}
+                      <button type="submit" class="h-9 w-9 rounded-lg bg-slate-100 text-slate-600 inline-flex items-center justify-center hover:bg-rose-50 hover:text-rose-600" title="Eliminar">
+                        <span class="material-icons text-[18px]">delete</span>
+                      </button>
+                    </form>
+                  </div>
+                  {% else %}
+                  <span class="text-xs font-bold text-slate-400">Solo lectura</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="2" class="px-6 py-14 text-center text-slate-500">No hay destinos registrados.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
+  </div>
 </div>
 
 <script>
-    function confirmDelete(nombre) {
-        return confirm(`¿Estás seguro de que deseas eliminar el destino "${nombre}"? Esta acción no se puede deshacer.`);
-    }
+  function confirmDelete(nombre) {
+    return confirm(`Eliminar destino "${nombre}"?`);
+  }
 </script>
 
 <style>
-    /* Estilizar los labels del formulario de Django */
-    .django-form-container p label {
-        display: block;
-        font-size: 0.7rem;
-        font-weight: 900;
-        text-transform: uppercase;
-        color: #64748b;
-        margin-bottom: 0.5rem;
-        letter-spacing: 0.1em;
-    }
-    .django-form-container p input, 
-    .django-form-container p select, 
-    .django-form-container p textarea {
-        width: 100%;
-        padding: 1rem 1.25rem;
-        border-radius: 1.25rem;
-        border: 1px solid #e2e8f0;
-        background-color: #f8fafc;
-        outline: none;
-        transition: all 0.3s;
-        margin-bottom: 1.25rem;
-        font-weight: 500;
-        color: #1e293b;
-    }
-    .django-form-container p input:focus {
-        border-color: #FF5A5F; /* Tu color primary */
-        background-color: #fff;
-        box-shadow: 0 0 0 4px rgba(255, 90, 95, 0.1);
-    }
+  .django-form-container p label {
+    display: block;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #64748b;
+    margin-bottom: .35rem;
+  }
+  .django-form-container p input,
+  .django-form-container p textarea,
+  .django-form-container p select {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: .85rem;
+    padding: .65rem .8rem;
+    margin-bottom: .85rem;
+    font-weight: 600;
+    color: #0f172a;
+    background: #fff;
+  }
+  .django-form-container p input:focus,
+  .django-form-container p textarea:focus,
+  .django-form-container p select:focus {
+    outline: none;
+    border-color: #0f766e;
+    box-shadow: 0 0 0 3px rgba(15,118,110,.12);
+  }
 </style>
 {% endblock %}

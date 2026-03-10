@@ -3,23 +3,34 @@
 
 {% block content %}
 
-<div class="bg-slate-50 min-h-screen py-10 relative">
+<div class="bg-slate-100 min-h-screen py-8 relative">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         <!-- HEADER -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
-                <h1 class="text-4xl font-black text-slate-900 tracking-tight italic">
-                    RESERVAS<span class="text-primary text-sm align-top ml-1">ADMIN</span>
+                <h1 class="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+                    Gestion de Reservas
                 </h1>
-                <p class="text-slate-500 text-[11px] font-bold uppercase tracking-[0.2em] mt-1">
-                    Control operativo de expediciones
+                <p class="text-slate-500 text-[11px] font-bold uppercase tracking-[0.16em] mt-1">
+                    Vista operativa y financiera
                 </p>
             </div>
 
             <a href="{% url 'panel_admin' %}"
-                class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-primary hover:border-primary/30 transition-all duration-300 font-bold text-sm shadow-sm">
-                <span class="material-icons text-base">arrow_back</span>
+                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all font-bold text-sm shadow-sm">
+                <span class="material-icons text-base">arrow_back</span> Panel
+            </a>
+        </div>
+
+        <div class="mb-6 inline-flex rounded-2xl bg-white border border-slate-200 p-1 shadow-sm">
+            <a href="{% url 'admin_reservas' %}?tipo=general{% if request.GET.fecha %}&fecha={{ request.GET.fecha }}{% endif %}"
+                class="px-4 py-2 rounded-xl text-sm font-bold {% if tipo_actual == 'general' %}bg-slate-900 text-white{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                Reservas generales
+            </a>
+            <a href="{% url 'admin_reservas' %}?tipo=agencia&estado_agencia={{ estado_agencia|default:'activos' }}{% if request.GET.fecha %}&fecha={{ request.GET.fecha }}{% endif %}"
+                class="px-4 py-2 rounded-xl text-sm font-bold {% if tipo_actual == 'agencia' %}bg-slate-900 text-white{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+                Reservas de agencias
             </a>
         </div>
 
@@ -51,19 +62,36 @@
             </span>
         </div>
         {% endif %}
+        {% if tipo_actual == "agencia" %}
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+            <div class="bg-white border border-slate-100 rounded-xl p-4">
+                <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Solicitudes pendientes</p>
+                <p class="text-3xl font-black text-amber-600 mt-1">{{ kpi_agencia.solicitudes_pendientes }}</p>
+            </div>
+            <div class="bg-white border border-slate-100 rounded-xl p-4">
+                <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Bloqueadas sin pago</p>
+                <p class="text-3xl font-black text-blue-600 mt-1">{{ kpi_agencia.bloqueadas_sin_pago }}</p>
+            </div>
+            <div class="bg-white border border-slate-100 rounded-xl p-4">
+                <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Pagadas hoy</p>
+                <p class="text-3xl font-black text-emerald-600 mt-1">{{ kpi_agencia.pagadas_hoy }}</p>
+            </div>
+            <div class="bg-white border border-slate-100 rounded-xl p-4">
+                <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Vencen hoy</p>
+                <p class="text-3xl font-black text-rose-600 mt-1">{{ kpi_agencia.vencen_hoy }}</p>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- BUSCADOR Y FILTROS -->
-        <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
-            <div class="flex gap-2">
-                <a href="{% url 'admin_tours' %}#calendario"
-                    class="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl text-xs font-bold border border-emerald-100 flex items-center gap-2 hover:bg-emerald-100 transition-all">
-                    <span class="material-icons text-sm">calendar_month</span> CALENDARIO DE DISPONIBILIDAD
-                </a>
-            </div>
-
+        <div class="flex flex-col md:flex-row justify-end items-center gap-3 mb-6">
             <div class="flex flex-col md:flex-row gap-3 w-full md:w-auto">
                 <!-- Filtro por Fecha -->
                 <form method="get" class="flex gap-2 items-center">
+                    <input type="hidden" name="tipo" value="{{ tipo_actual|default:'general' }}">
+                    {% if tipo_actual == "agencia" %}
+                    <input type="hidden" name="estado_agencia" value="{{ estado_agencia|default:'activos' }}">
+                    {% endif %}
                     <input type="date" name="fecha" value="{{ request.GET.fecha }}"
                         class="px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none font-semibold text-slate-700 text-sm">
                     <button type="submit"
@@ -81,21 +109,40 @@
                 <div class="relative group w-full md:w-64">
                     <span
                         class="material-icons absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary">search</span>
-                    <input type="text" id="reservaSearch" placeholder="Nombre o Tour..."
+                    <input type="text" id="reservaSearch" placeholder="Buscar pasajero, agencia o tour..."
                         class="pl-12 pr-6 py-3 bg-white border border-slate-200 rounded-xl w-full shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none font-semibold text-slate-700 text-sm"
                         onkeyup="filterReservas()">
                 </div>
+                {% if tipo_actual == "agencia" %}
+                <form method="get" class="flex gap-2 items-center">
+                    <input type="hidden" name="tipo" value="agencia">
+                    {% if request.GET.fecha %}
+                    <input type="hidden" name="fecha" value="{{ request.GET.fecha }}">
+                    {% endif %}
+                    <select name="estado_agencia"
+                        class="px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none font-semibold text-slate-700 text-sm">
+                        <option value="activos" {% if estado_agencia == "activos" %}selected{% endif %}>Activos</option>
+                        <option value="solicitud_agencia" {% if estado_agencia == "solicitud_agencia" %}selected{% endif %}>Solicitudes</option>
+                        <option value="bloqueada_por_agencia" {% if estado_agencia == "bloqueada_por_agencia" %}selected{% endif %}>Bloqueadas sin pago</option>
+                        <option value="pagada_total_agencia" {% if estado_agencia == "pagada_total_agencia" %}selected{% endif %}>Pagadas</option>
+                    </select>
+                    <button type="submit"
+                        class="bg-slate-900 text-white px-4 py-3 rounded-xl hover:bg-primary transition-all text-xs font-bold">
+                        Filtrar
+                    </button>
+                </form>
+                {% endif %}
             </div>
         </div>
 
         <!-- TABLA -->
-        <div class="bg-white rounded-[2.5rem] shadow border border-slate-100 overflow-hidden">
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse" id="tabla-reservas">
-                    <thead class="bg-slate-900 text-white text-[10px] uppercase tracking-[0.3em]">
+                    <thead class="bg-slate-950 text-white text-[10px] uppercase tracking-[0.2em]">
                         <tr>
                             <th class="px-8 py-7">Ref.</th>
-                            <th class="px-8 py-7">Pasajero</th>
+                            <th class="px-8 py-7">{% if tipo_actual == "agencia" %}Pasajero / Agencia{% else %}Pasajero{% endif %}</th>
                             <th class="px-8 py-7">Tour</th>
                             <th class="px-8 py-7">Total</th>
                             <th class="px-8 py-7 text-center">Estado</th>
@@ -161,16 +208,55 @@
                                 </span>
                             </td>
                             <td class="px-8 py-6 text-center">
-                                {% if r.es_reserva_agencia %}
-                                <div class="inline-flex items-center gap-2">
-                                    {% if r.estado == "pagada" or r.tiene_pago %}
+                                {% if tipo_actual == "agencia" %}
+                                    {% if r.estado == "solicitud_agencia" %}
+                                    <div class="flex flex-col gap-2 min-w-[170px]">
+                                        <form method="post" action="{% url 'gestionar_solicitud_agencia' r.id %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="accion" value="aceptar">
+                                            <input type="hidden" name="tipo" value="agencia">
+                                            <input type="hidden" name="estado_agencia" value="{{ estado_agencia|default:'activos' }}">
+                                            {% if request.GET.fecha %}<input type="hidden" name="fecha" value="{{ request.GET.fecha }}">{% endif %}
+                                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+                                                Aceptar bloqueo
+                                            </button>
+                                        </form>
+                                        <form method="post" action="{% url 'gestionar_solicitud_agencia' r.id %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="accion" value="rechazar">
+                                            <input type="hidden" name="tipo" value="agencia">
+                                            <input type="hidden" name="estado_agencia" value="{{ estado_agencia|default:'activos' }}">
+                                            {% if request.GET.fecha %}<input type="hidden" name="fecha" value="{{ request.GET.fecha }}">{% endif %}
+                                            <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+                                                Rechazar
+                                            </button>
+                                        </form>
+                                    </div>
+                                    {% elif r.estado == "bloqueada_por_agencia" %}
+                                    <form method="post" action="{% url 'registrar_pago_agencia' r.id %}" class="flex items-center gap-2 justify-center min-w-[230px]">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="tipo" value="agencia">
+                                        <input type="hidden" name="estado_agencia" value="{{ estado_agencia|default:'activos' }}">
+                                        {% if request.GET.fecha %}<input type="hidden" name="fecha" value="{{ request.GET.fecha }}">{% endif %}
+                                        <input type="number" step="0.01" min="0.01" name="monto_pagado" value="{{ r.total_pagar|floatformat:2 }}"
+                                            class="w-28 border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold" placeholder="Monto">
+                                        <button type="submit"
+                                            class="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+                                            Registrar pago
+                                        </button>
+                                    </form>
+                                    {% elif r.estado == "pagada_total_agencia" or r.estado == "pagada" or r.tiene_pago %}
                                     <a href="{% url 'ver_ticket_pdf' r.id %}" target="_blank"
-                                        class="bg-indigo-600 text-white px-3 py-1 rounded-lg text-xs">Ver PDF</a>
-                                    {% endif %}
+                                        class="inline-flex items-center bg-indigo-600 text-white px-3 py-1 rounded-lg text-xs font-bold">Ver PDF</a>
+                                    {% else %}
                                     <span class="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-xs font-bold">
-                                        Solo gestion agencia
+                                        En gestion
                                     </span>
-                                </div>
+                                    {% endif %}
+                                {% elif r.es_reserva_agencia %}
+                                <span class="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-xs font-bold">
+                                    Gestionar en tab Agencia
+                                </span>
                                 {% elif r.estado == "pagada" or r.tiene_pago %}
                                 <div class="inline-flex items-center gap-2">
                                     <a href="{% url 'ver_ticket_pdf' r.id %}" target="_blank"

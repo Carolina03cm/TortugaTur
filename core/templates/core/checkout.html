@@ -240,7 +240,7 @@
 
     paypal.Buttons({
         createOrder: async function () {
-            const response = await fetch("{% url 'create_paypal_order' reserva.id %}", {
+            const response = await fetch("{% url 'create_paypal_order' reserva.id %}{% if request.GET.embed == '1' %}?embed=1{% endif %}", {
                 method: "POST",
                 headers: {
                     "X-CSRFToken": getCookie("csrftoken")
@@ -254,7 +254,7 @@
             return data.orderID;
         },
         onApprove: async function (data) {
-            const response = await fetch("{% url 'capture_paypal_order' reserva.id %}", {
+            const response = await fetch("{% url 'capture_paypal_order' reserva.id %}{% if request.GET.embed == '1' %}?embed=1{% endif %}", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

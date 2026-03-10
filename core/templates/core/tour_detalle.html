@@ -137,7 +137,7 @@
                 </div>
             </section>
         </div>
-
+        
         <div class="lg:col-span-1">
             {% if salidas %}
             <div id="reservaContainer"
@@ -191,35 +191,142 @@
                                 {% endif %}
                             </div>
                         </div>
-
+                        
                         <div class="space-y-3">
                             <label class="block text-[10px] font-black uppercase text-slate-400 tracking-[0.15em]">2.
                                 Pasajeros</label>
-                            <div class="grid grid-cols-2 gap-4">
+
+                            {% if user_is_agencia %}
+                            <div class="grid grid-cols-1 gap-4">
+
                                 <div class="bg-slate-50 rounded-2xl p-3 border border-slate-100 text-center">
                                     <span class="text-[10px] font-black text-slate-400 block mb-2">ADULTOS</span>
+
                                     <div class="flex items-center justify-between px-2">
-                                        <button type="button" onclick="cambiar('adultos', -1)"
-                                            class="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm font-black text-slate-600 hover:bg-primary hover:text-white transition-all">-</button>
-                                        <input type="text" id="adultos" name="adultos" value="0" readonly
+
+                                        <button type="button"
+                                            onclick="cambiar('adultos', -1)"
+                                            data-passenger-btn="1"
+                                            class="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm font-black text-slate-600 hover:bg-primary hover:text-white transition-all">
+                                            -
+                                        </button>
+
+                                        <input
+                                            type="text"
+                                            id="adultos"
+                                            name="adultos"
+                                            value="0"
+                                            onclick="this.select()"
+                                            inputmode="numeric"
+                                            pattern="[0-9]*"
+                                            oninput="this.value = this.value.replace(/[^0-9]/g, '')"
                                             class="w-12 text-center bg-transparent font-black text-2xl text-slate-900 focus:ring-0 border-none">
-                                        <button type="button" onclick="cambiar('adultos', 1)"
-                                            class="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm font-black text-slate-600 hover:bg-primary hover:text-white transition-all">+</button>
+
+                                        <button type="button"
+                                            onclick="cambiar('adultos', 1)"
+                                            data-passenger-btn="1"
+                                            class="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm font-black text-slate-600 hover:bg-primary hover:text-white transition-all">
+                                            +
+                                        </button>
+
                                     </div>
                                 </div>
-                                <div class="bg-slate-50 rounded-2xl p-3 border border-slate-100 text-center">
-                                    <span class="text-[10px] font-black text-slate-400 block mb-2">NIÑOS</span>
-                                    <div class="flex items-center justify-between px-2">
-                                        <button type="button" onclick="cambiar('ninos', -1)"
-                                            class="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm font-black text-slate-600 hover:bg-primary hover:text-white transition-all">-</button>
-                                        <input type="text" id="ninos" name="ninos" value="0" readonly
-                                            class="w-12 text-center bg-transparent font-black text-2xl text-slate-900 focus:ring-0 border-none">
-                                        <button type="button" onclick="cambiar('ninos', 1)"
-                                            class="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm font-black text-slate-600 hover:bg-primary hover:text-white transition-all">+</button>
-                                    </div>
-                                </div>
+
                             </div>
+
+                            <input type="hidden" id="ninos" name="ninos" value="0">
+
+                            {% else %}
+
+                            <div class="grid grid-cols-2 gap-4">
+
+                                <!-- ADULTOS -->
+                                <div class="bg-slate-50 rounded-2xl p-3 border border-slate-100 text-center">
+
+                                    <span class="text-[10px] font-black text-slate-400 block mb-2">ADULTOS</span>
+
+                                    <div class="flex items-center justify-between px-2">
+
+                                        <button type="button"
+                                            onclick="cambiar('adultos', -1)"
+                                            data-passenger-btn="1"
+                                            class="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm font-black text-slate-600 hover:bg-primary hover:text-white transition-all">
+                                            -
+                                        </button>
+
+                                        <input
+                                            type="text"
+                                            id="adultos"
+                                            name="adultos"
+                                            value="0"
+                                            onclick="this.select()"
+                                            inputmode="numeric"
+                                            pattern="[0-9]*"
+                                            oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                                            class="w-12 text-center bg-transparent font-black text-2xl text-slate-900 focus:ring-0 border-none">
+
+                                        <button type="button"
+                                            onclick="cambiar('adultos', 1)"
+                                            data-passenger-btn="1"
+                                            class="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm font-black text-slate-600 hover:bg-primary hover:text-white transition-all">
+                                            +
+                                        </button>
+
+                                    </div>
+
+                                </div>
+
+                                <!-- NIÑOS -->
+                                <div class="bg-slate-50 rounded-2xl p-3 border border-slate-100 text-center">
+
+                                    <span class="text-[10px] font-black text-slate-400 block mb-2">NIÑOS</span>
+
+                                    <div class="flex items-center justify-between px-2">
+
+                                        <button type="button"
+                                            onclick="cambiar('ninos', -1)"
+                                            data-passenger-btn="1"
+                                            class="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm font-black text-slate-600 hover:bg-primary hover:text-white transition-all">
+                                            -
+                                        </button>
+
+                                        <input
+                                            type="text"
+                                            id="ninos"
+                                            name="ninos"
+                                            value="0"
+                                            onclick="this.select()"
+                                            inputmode="numeric"
+                                            pattern="[0-9]*"
+                                            oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                                            class="w-12 text-center bg-transparent font-black text-2xl text-slate-900 focus:ring-0 border-none">
+
+                                        <button type="button"
+                                            onclick="cambiar('ninos', 1)"
+                                            data-passenger-btn="1"
+                                            class="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm font-black text-slate-600 hover:bg-primary hover:text-white transition-all">
+                                            +
+                                        </button>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                            {% endif %}
                         </div>
+                        
+                        {% if user_is_agencia %}
+                        <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4">
+                            <label class="flex items-center gap-3 text-sm font-bold text-slate-700 cursor-pointer">
+                                <input type="checkbox" id="charterAgencia" name="charter_agencia"
+                                    class="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary/40"
+                                    onchange="toggleCharterAgencia()">
+                                Charter completo (16 pasajeros fijos)
+                            </label>
+                        </div>
+                        {% endif %}
 
                         <div id="bloqueEdadNino" class="space-y-2 hidden">
                             <label class="block text-[10px] font-black uppercase text-slate-400 tracking-[0.15em]">
@@ -227,7 +334,13 @@
                             </label>
                             <div id="listaEdadesNinos" class="space-y-2"></div>
                         </div>
+                        {% if not aplica_descuento_ninos %}
+                        <p id="notaSinDescuentoNinos" class="text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3">
+                            El descuento de ninos no aplica para este tour. No necesitas ingresar edades.
+                        </p>
+                        {% endif %}
 
+                        {% if not user_is_agencia %}
                         <div class="bg-slate-900 rounded-[2rem] p-6 text-white shadow-xl relative mt-4">
                             <!-- Currency Selector Integrado (Sin Recarga) -->
                             <div
@@ -264,6 +377,12 @@
                                 Pago se procesa en {{ payment_currency }} al tipo de cambio referencial.
                             </p>
                         </div>
+                        {% else %}
+                        <div class="bg-blue-50 rounded-[2rem] p-6 text-blue-900 border border-blue-100 mt-4">
+                            <p class="text-[10px] uppercase tracking-widest font-black text-blue-500">Agencia</p>
+                            <p class="text-sm font-bold mt-1">Reserva sin precio. Solo indica pasajeros o usa charter de 16.</p>
+                        </div>
+                        {% endif %}
 
 
                         <p id="error-msg"
@@ -308,31 +427,27 @@
                         </div>
 
                         <div class="space-y-4">
-                            <input type="text" name="nombre" value="{{ user.first_name }}" placeholder="Nombre"
-                                class="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 outline-none focus:ring-4 focus:ring-primary/10 font-bold"
-                                required>
-                            <input type="tel" name="telefono" placeholder="WhatsApp (Ej: +593...)"
-                                class="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 outline-none focus:ring-4 focus:ring-primary/10 font-bold"
-                                required>
-                            <input type="text" name="identificacion" placeholder="Cédula o Pasaporte"
-                                class="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 outline-none focus:ring-4 focus:ring-primary/10 font-bold"
-                                required>
-
                             {% if user_is_agencia %}
+                            <input type="hidden" name="nombre" value="{{ user.get_full_name|default:user.username }}">
+                            <input type="hidden" name="telefono" value="">
+                            <input type="hidden" name="identificacion" value="">
+
                             <div class="mt-4 p-4 border border-blue-100 bg-blue-50/50 rounded-2xl space-y-4">
                                 <h4
                                     class="text-xs font-black text-blue-800 uppercase tracking-widest flex items-center gap-2">
                                     <span class="material-icons border-none text-sm">business_center</span>
-                                    Datos de Agencia
+                                    Solicitud de Agencia
                                 </h4>
+                                <p class="text-sm text-blue-800">
+                                    No necesitas llenar datos de pasajero. Al continuar, la solicitud quedara pendiente
+                                    para que secretaria la acepte o la rechace.
+                                </p>
 
-                                <input type="text" name="codigo_agencia" placeholder="Código VOUCHER (Obligatorio)"
-                                    class="w-full bg-white p-4 rounded-xl border border-blue-100 outline-none focus:ring-4 focus:ring-blue-500/10 font-bold text-sm text-blue-900 placeholder-blue-300"
-                                    required>
+                                <input type="text" name="codigo_agencia" placeholder="Codigo voucher (Opcional)"
+                                    class="w-full bg-white p-4 rounded-xl border border-blue-100 outline-none focus:ring-4 focus:ring-blue-500/10 font-bold text-sm text-blue-900 placeholder-blue-300">
 
                                 <div class="flex flex-col gap-2 relative">
-                                    <label class="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Subir
-                                        documento de respaldo (Opcional)</label>
+                                    <label class="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Documento de respaldo (Opcional)</label>
                                     <input type="file" name="archivo_agencia" accept=".pdf,.png,.jpg,.jpeg" class="block w-full text-sm text-slate-500
                                         file:mr-4 file:py-2 file:px-4
                                         file:rounded-full file:border-0
@@ -342,12 +457,21 @@
                                         ">
                                 </div>
                             </div>
+                            {% else %}
+                            <input type="text" name="nombre" value="{{ user.first_name }}" placeholder="Nombre"
+                                class="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 outline-none focus:ring-4 focus:ring-primary/10 font-bold"
+                                required>
+                            <input type="tel" name="telefono" placeholder="WhatsApp (Ej: +593...)"
+                                class="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 outline-none focus:ring-4 focus:ring-primary/10 font-bold"
+                                required>
+                            <input type="text" name="identificacion" placeholder="Cedula o Pasaporte"
+                                class="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 outline-none focus:ring-4 focus:ring-primary/10 font-bold"
+                                required>
                             {% endif %}
                         </div>
-
                         <button type="submit" id="btnConfirmar"
                             class="w-full py-6 bg-green-600 hover:bg-green-700 text-white rounded-[2.5rem] font-black shadow-2xl transition-all">
-                            CONFIRMAR AHORA
+                            {% if user_is_agencia %}ENVIAR SOLICITUD{% else %}CONFIRMAR AHORA{% endif %}
                         </button>
                     </div>
                     {% endif %}
@@ -393,6 +517,8 @@
     const precioNinoEdad6MasBase = parseFloat("{{ child_price_normal }}".replace(',', '.'));
 
     const usuarioLogueado = "{{ user.is_authenticated|yesno:'true,false' }}" === "true";
+    const usuarioEsAgencia = "{{ user_is_agencia|yesno:'true,false' }}" === "true";
+    const descuentoNinosActivo = "{{ aplica_descuento_ninos|yesno:'true,false' }}" === "true";
     const turnosOcupadosAgencia = JSON.parse('{{ bloqueos_agencia_json|default:"{}"|safe|escapejs }}');
 
     function actualizarHorariosAgencia() {
@@ -436,6 +562,12 @@
         const lista = document.getElementById('listaEdadesNinos');
         const edadesActuales = Array.from(document.querySelectorAll('input[name="edades_ninos"]')).map(input => input.value);
 
+        if (!descuentoNinosActivo) {
+            bloqueEdad.classList.add('hidden');
+            lista.innerHTML = '';
+            return;
+        }
+
         if (totalNinos > 0) {
             bloqueEdad.classList.remove('hidden');
             if (lista.childElementCount !== totalNinos) {
@@ -464,6 +596,10 @@
     }
 
     function calcularTotalNinosBase(edadesNinos) {
+        if (!descuentoNinosActivo) {
+            const totalNinos = parseInt(document.getElementById('ninos').value) || 0;
+            return totalNinos * precioNinoEdad6MasBase;
+        }
         return edadesNinos.reduce((acc, edad) => acc + obtenerPrecioNinoPorEdadEnBase(edad), 0);
     }
 
@@ -513,7 +649,59 @@
         window.history.replaceState({}, '', url);
     }
 
+    function _maxPermitido() {
+        const select = document.getElementById('selectSalida');
+        let max = 16;
+        if (select && select.value) {
+            const selectedOption = select.options[select.selectedIndex];
+            const cupos = parseInt(selectedOption?.getAttribute('data-cupos'));
+            if (!isNaN(cupos)) {
+                max = Math.min(max, cupos);
+            }
+        }
+        return max;
+    }
+
+    function aplicarLimitePasajeros(changedId) {
+        const adultosInput = document.getElementById('adultos');
+        const ninosInput = document.getElementById('ninos');
+        if (!adultosInput) return;
+
+        let ad = parseInt(adultosInput.value) || 0;
+        let ni = ninosInput ? (parseInt(ninosInput.value) || 0) : 0;
+        const max = _maxPermitido();
+
+        if (ad > max) ad = max;
+        if (ni > max) ni = max;
+
+        const total = ad + ni;
+        if (total > max) {
+            if (changedId === 'adultos') {
+                ad = Math.max(max - ni, 0);
+            } else if (changedId === 'ninos') {
+                ni = Math.max(max - ad, 0);
+            } else {
+                const exceso = total - max;
+                if (ni >= exceso) {
+                    ni = Math.max(ni - exceso, 0);
+                } else {
+                    ad = Math.max(ad - (exceso - ni), 0);
+                    ni = 0;
+                }
+            }
+        }
+
+        adultosInput.value = ad;
+        if (ninosInput) ninosInput.value = ni;
+    }
+
     function cambiar(idInput, delta) {
+        const charterInput = document.getElementById('charterAgencia');
+        if (charterInput && charterInput.checked) {
+            mostrarError("El charter fija automaticamente 16 pasajeros.");
+            return;
+        }
+
         const input = document.getElementById(idInput);
         let valor = parseInt(input.value) || 0;
         let nuevo = valor + delta;
@@ -524,27 +712,33 @@
 
         if (delta > 0) {
             const totalActual = (parseInt(document.getElementById('adultos').value) || 0) + (parseInt(document.getElementById('ninos').value) || 0);
-
-            if (dateInput) {
-                // If it's an agency using the date input, limit is 16
-                if (totalActual >= 16) {
-                    mostrarError("Las agencias solo pueden bloquear un máximo de 16 pasajeros por reserva.");
-                    return;
-                }
-            } else if (select && select.value) {
-                // Regular user using the dropdown
-                const selectedOption = select.options[select.selectedIndex];
-                if (selectedOption && selectedOption.hasAttribute('data-cupos')) {
-                    const cuposMax = parseInt(selectedOption.getAttribute('data-cupos'));
-                    if (totalActual >= cuposMax) {
-                        mostrarError("No hay más cupos disponibles para esta fecha.");
-                        return;
-                    }
-                }
+            const maxPermitido = _maxPermitido();
+            if (totalActual >= maxPermitido) {
+                mostrarError(`No puedes superar ${maxPermitido} pasajeros.`);
+                return;
             }
         }
 
         input.value = nuevo;
+        aplicarLimitePasajeros(idInput);
+        recalcular();
+    }
+
+    function toggleCharterAgencia() {
+        const charterInput = document.getElementById('charterAgencia');
+        if (!charterInput) return;
+
+        const adultosInput = document.getElementById('adultos');
+        const ninosInput = document.getElementById('ninos');
+        const botonesPasajeros = document.querySelectorAll('[data-passenger-btn=\"1\"]');
+
+        if (charterInput.checked) {
+            adultosInput.value = 16;
+            ninosInput.value = 0;
+            botonesPasajeros.forEach(btn => btn.disabled = true);
+        } else {
+            botonesPasajeros.forEach(btn => btn.disabled = false);
+        }
         recalcular();
     }
 
@@ -575,7 +769,24 @@
 
     // Ejecutar recalcular al inicio para pintar las duraciones correctas si ya hay una salida seleccionada
     document.addEventListener("DOMContentLoaded", () => {
+        const adultosInput = document.getElementById('adultos');
+        const ninosInput = document.getElementById('ninos');
+        if (adultosInput) {
+            adultosInput.addEventListener('input', () => {
+                adultosInput.value = adultosInput.value.replace(/[^0-9]/g, '');
+                aplicarLimitePasajeros('adultos');
+                recalcular();
+            });
+        }
+        if (ninosInput) {
+            ninosInput.addEventListener('input', () => {
+                ninosInput.value = ninosInput.value.replace(/[^0-9]/g, '');
+                aplicarLimitePasajeros('ninos');
+                recalcular();
+            });
+        }
         actualizarHorariosAgencia();
+        toggleCharterAgencia();
         recalcular();
     });
 
@@ -605,7 +816,7 @@
             return;
         }
 
-                if (totalNinos > 0) {
+        if (descuentoNinosActivo && totalNinos > 0) {
             if (edadesNinos.length !== totalNinos) {
                 mostrarError("Debes ingresar la edad de cada nino.");
                 return;
@@ -618,7 +829,9 @@
             }
         }
 
-        if (usuarioLogueado) {
+        if (usuarioLogueado && usuarioEsAgencia) {
+            formReserva?.requestSubmit();
+        } else if (usuarioLogueado) {
             document.getElementById('paso1').classList.add('hidden');
             document.getElementById('paso2').classList.remove('hidden');
         } else {
@@ -678,4 +891,5 @@
     }
 </script>
 {% endblock %}
+
 

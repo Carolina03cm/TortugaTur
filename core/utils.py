@@ -1,18 +1,12 @@
 from io import BytesIO
 import hashlib
+from decimal import Decimal
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfgen import canvas
 from reportlab.graphics.barcode import code128
 from reportlab.platypus import Table, TableStyle, SimpleDocTemplate, Paragraph, Spacer
-
-
-def _fmt_money(value):
-    try:
-        return f"$ {float(value):,.2f} USD"
-    except (TypeError, ValueError):
-        return "$ 0.00 USD"
 
 
 def _safe_text(value, default="-"):
@@ -26,6 +20,25 @@ def _access_key(reserva, empresa_ruc):
     seed = f"{empresa_ruc}|{reserva.id}|{reserva.fecha_reserva.isoformat()}|{reserva.total_pagar}"
     digest = hashlib.sha1(seed.encode("utf-8")).hexdigest().upper()
     return f"{reserva.fecha_reserva.strftime('%Y%m%d')}{digest[:24]}"
+
+
+def _es_reserva_agencia(reserva):
+    estado = (getattr(reserva, "estado", "") or "").lower()
+    return bool(
+        (getattr(reserva, "tipo_reserva", "") == "agencia")
+        or (getattr(reserva, "codigo_agencia", "") or "").strip()
+        or getattr(reserva, "hora_turno_agencia", None)
+        or (getattr(reserva, "agencia_nombre", "") or "").strip()
+        or estado in {
+            "solicitud_agencia",
+            "cotizada_agencia",
+            "confirmada_agencia",
+            "pagada_parcial_agencia",
+            "pagada_total_agencia",
+            "rechazada_agencia",
+            "bloqueada_por_agencia",
+        }
+    )
 
 
 def generar_ticket_pdf(reserva, empresa=None):
@@ -149,50 +162,84 @@ def generar_ticket_pdf(reserva, empresa=None):
         f"Salida: {reserva.salida.fecha.strftime('%d/%m/%Y')} {hora_salida}",
     )
 
+    es_agencia = _es_reserva_agencia(reserva)
+    monto_pagado_agencia = getattr(reserva, "monto_pagado_agencia", None) or Decimal("0.00")
+    total_factura = Decimal(reserva.total_pagar or 0)
+    if es_agencia and monto_pagado_agencia > 0:
+        total_factura = Decimal(monto_pagado_agencia)
+
     # Detail table
-    precio_adulto = reserva.salida.tour.precio_adulto_final()
-    precio_nino = reserva.salida.tour.precio_nino_final()
-    subtotal_adultos = reserva.adultos * precio_adulto
-    subtotal_ninos = reserva.ninos * precio_nino
-
-    data = [["Codigo", "Descripcion", "Cant.", "P. Unitario", "Subtotal"]]
-    if reserva.adultos > 0:
+    if es_agencia:
+        data = [["Codigo", "Descripcion", "Cant.", "Monto"]]
         data.append([
-            "A001",
-            f"Adulto - {reserva.salida.tour.nombre}",
-            str(reserva.adultos),
-            f"{float(precio_adulto):.2f}",
-            f"{float(subtotal_adultos):.2f}",
+            "AG01",
+            f"Reserva de agencia - {reserva.salida.tour.nombre}",
+            "1",
+            f"{float(total_factura):.2f}",
         ])
-    if reserva.ninos > 0:
-        data.append([
-            "N001",
-            "Nino (tarifa segun edad)",
-            str(reserva.ninos),
-            f"{float(precio_nino):.2f}",
-            f"{float(subtotal_ninos):.2f}",
-        ])
-    data.append(["", "", "", "TOTAL A COBRAR USD", f"{float(reserva.total_pagar):.2f}"])
+        data.append(["", "", "TOTAL A COBRAR USD", f"{float(total_factura):.2f}"])
+        row_heights = [24, 22, 26]
+        table = Table(data, colWidths=[64, 306, 84, 86], rowHeights=row_heights)
+        style = [
+            ("BACKGROUND", (0, 0), (-1, 0), color_primary),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), 10),
+            ("ALIGN", (0, 0), (0, -1), "CENTER"),
+            ("ALIGN", (2, 0), (3, -1), "RIGHT"),
+            ("ALIGN", (1, 0), (1, -1), "LEFT"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -2), 0.5, color_border),
+            ("LINEABOVE", (0, -1), (-1, -1), 1, color_secondary),
+            ("FONTNAME", (2, -1), (3, -1), "Helvetica-Bold"),
+            ("TEXTCOLOR", (2, -1), (3, -1), color_primary),
+            ("BACKGROUND", (0, -1), (-1, -1), color_light),
+        ]
+        table.setStyle(TableStyle(style))
+    else:
+        precio_adulto = reserva.salida.tour.precio_adulto_final()
+        precio_nino = reserva.salida.tour.precio_nino_final()
+        subtotal_adultos = reserva.adultos * precio_adulto
+        subtotal_ninos = reserva.ninos * precio_nino
 
-    row_heights = [24] + [22] * (len(data) - 2) + [26]
-    table = Table(data, colWidths=[64, 246, 50, 90, 90], rowHeights=row_heights)
-    style = [
-        ("BACKGROUND", (0, 0), (-1, 0), color_primary),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, 0), 10),
-        ("ALIGN", (0, 0), (0, -1), "CENTER"),
-        ("ALIGN", (2, 0), (2, -1), "CENTER"),
-        ("ALIGN", (3, 0), (4, -1), "RIGHT"),
-        ("ALIGN", (1, 0), (1, -1), "LEFT"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("GRID", (0, 0), (-1, -2), 0.5, color_border),
-        ("LINEABOVE", (0, -1), (-1, -1), 1, color_secondary),
-        ("FONTNAME", (3, -1), (4, -1), "Helvetica-Bold"),
-        ("TEXTCOLOR", (3, -1), (4, -1), color_primary),
-        ("BACKGROUND", (0, -1), (-1, -1), color_light),
-    ]
-    table.setStyle(TableStyle(style))
+        data = [["Codigo", "Descripcion", "Cant.", "P. Unitario", "Subtotal"]]
+        if reserva.adultos > 0:
+            data.append([
+                "A001",
+                f"Adulto - {reserva.salida.tour.nombre}",
+                str(reserva.adultos),
+                f"{float(precio_adulto):.2f}",
+                f"{float(subtotal_adultos):.2f}",
+            ])
+        if reserva.ninos > 0:
+            data.append([
+                "N001",
+                "Nino (tarifa segun edad)",
+                str(reserva.ninos),
+                f"{float(precio_nino):.2f}",
+                f"{float(subtotal_ninos):.2f}",
+            ])
+        data.append(["", "", "", "TOTAL A COBRAR USD", f"{float(total_factura):.2f}"])
+
+        row_heights = [24] + [22] * (len(data) - 2) + [26]
+        table = Table(data, colWidths=[64, 246, 50, 90, 90], rowHeights=row_heights)
+        style = [
+            ("BACKGROUND", (0, 0), (-1, 0), color_primary),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), 10),
+            ("ALIGN", (0, 0), (0, -1), "CENTER"),
+            ("ALIGN", (2, 0), (2, -1), "CENTER"),
+            ("ALIGN", (3, 0), (4, -1), "RIGHT"),
+            ("ALIGN", (1, 0), (1, -1), "LEFT"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -2), 0.5, color_border),
+            ("LINEABOVE", (0, -1), (-1, -1), 1, color_secondary),
+            ("FONTNAME", (3, -1), (4, -1), "Helvetica-Bold"),
+            ("TEXTCOLOR", (3, -1), (4, -1), color_primary),
+            ("BACKGROUND", (0, -1), (-1, -1), color_light),
+        ]
+        table.setStyle(TableStyle(style))
 
     table_height = sum(row_heights)
     table_y = top_y - 18 - table_height
@@ -209,7 +256,7 @@ def generar_ticket_pdf(reserva, empresa=None):
     p.drawString(width - margin_x - 198, summary_y + 28, "Descuento")
     p.drawString(width - margin_x - 198, summary_y + 14, "Total")
     p.setFillColor(color_text)
-    total_float = float(reserva.total_pagar)
+    total_float = float(total_factura)
     p.drawRightString(width - margin_x - 10, summary_y + 42, f"{total_float:.2f} USD")
     p.drawRightString(width - margin_x - 10, summary_y + 28, "0.00 USD")
     p.setFont("Helvetica-Bold", 10)

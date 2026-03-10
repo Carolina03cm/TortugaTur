@@ -30,6 +30,21 @@ class Tour(models.Model):
     # Horarios automáticos cada día
     hora_turno_1 = models.TimeField(null=True, blank=True, verbose_name="Hora Turno 1")
     hora_turno_2 = models.TimeField(null=True, blank=True, verbose_name="Hora Turno 2")
+    descuento_ninos_activo = models.BooleanField(
+        default=True,
+        verbose_name="Aplicar descuento a ninos",
+        help_text="Si se desactiva, los ninos pagan tarifa de adulto.",
+    )
+    descuento_ninos_agencia_activo = models.BooleanField(
+        default=False,
+        verbose_name="Aplicar descuento ninos (agencias)",
+        help_text="Control independiente para proceso de agencias.",
+    )
+    visible_para_agencias = models.BooleanField(
+        default=True,
+        verbose_name="Visible para agencias",
+        help_text="Si se desactiva, este tour no aparecera para cuentas de agencia.",
+    )
 
     def __str__(self):
         return f"{self.nombre} - {self.destino.nombre}"
@@ -60,9 +75,19 @@ class SalidaTour(models.Model):
         return self.cupos_disponibles >= total
 
 class Reserva(models.Model):
-    # --- CAMBIO: Se agrega "pagada" a los ESTADOS ---
+    TIPOS_RESERVA = (
+        ("general", "Reserva General"),
+        ("agencia", "Reserva de Agencia"),
+    )
+
     ESTADOS = (
         ("pendiente", "Pendiente"),
+        ("solicitud_agencia", "Solicitud Agencia"),
+        ("cotizada_agencia", "Cotizada Agencia"),
+        ("confirmada_agencia", "Confirmada Agencia"),
+        ("pagada_parcial_agencia", "Pagada Parcial Agencia"),
+        ("pagada_total_agencia", "Pagada Total Agencia"),
+        ("rechazada_agencia", "Rechazada Agencia"),
         ("confirmada", "Confirmada"),
         ("pagada", "Pagada"),
         ("cancelada", "Cancelada"),
@@ -75,8 +100,20 @@ class Reserva(models.Model):
     ninos = models.PositiveIntegerField()
     total_pagar = models.DecimalField(max_digits=10, decimal_places=2)
     estado = models.CharField(max_length=30, choices=ESTADOS, default="pendiente")
+    tipo_reserva = models.CharField(
+        max_length=20,
+        choices=TIPOS_RESERVA,
+        default="general",
+    )
     fecha_reserva = models.DateTimeField(default=timezone.now)
     creado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="reservas_creadas")
+    gestionada_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reservas_gestionadas",
+    )
     
     # Nuevos campos para tracking de agencias
     archivo_agencia = models.FileField(upload_to='agencia_vouchers/', null=True, blank=True)
@@ -85,6 +122,12 @@ class Reserva(models.Model):
     alerta_24h_agencia_enviada_en = models.DateTimeField(null=True, blank=True)
     hora_turno_agencia = models.TimeField(null=True, blank=True)
     hora_turno_libre = models.TimeField(null=True, blank=True)
+    agencia_nombre = models.CharField(max_length=150, blank=True, default="")
+    agencia_contacto = models.CharField(max_length=120, blank=True, default="")
+    agencia_telefono = models.CharField(max_length=30, blank=True, default="")
+    agencia_correo = models.EmailField(blank=True, default="")
+    monto_pagado_agencia = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    observaciones_agencia = models.TextField(blank=True, default="")
 
     # Datos del cliente
     nombre = models.CharField(max_length=100)

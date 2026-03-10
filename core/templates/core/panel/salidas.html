@@ -1,222 +1,123 @@
 ﻿{% extends "core/base.html" %}
-{% block title %}Gestión de Salidas | TortugaTur{% endblock %}
+{% block title %}Salidas | TortugaTur{% endblock %}
 
 {% block content %}
-<div class="bg-slate-50 min-h-screen py-10">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="min-h-screen bg-slate-100 py-8">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
-        {% if messages %}
-        <div class="mb-6 space-y-2">
-            {% for m in messages %}
-            <div
-                class="p-4 rounded-lg border {% if m.tags == 'success' %}bg-green-50 border-green-200 text-green-700{% else %}bg-red-50 border-red-200 text-red-700{% endif %} flex items-center gap-2 shadow-sm">
-                <span class="material-icons text-sm">
-                    {% if m.tags == "success" %}
-                    check_circle
-                    {% else %}
-                    info
-                    {% endif %}
-                </span>
-                <span class="text-sm font-medium">{{ m }}</span>
-            </div>
-            {% endfor %}
+    <section class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <p class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Operacion</p>
+          <h1 class="text-3xl font-black text-slate-900">Gestion de Salidas</h1>
+          <p class="text-sm text-slate-500 mt-1">Controla fechas, cupos y acciones administrativas.</p>
         </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="{% url 'panel_admin' %}" class="h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-bold inline-flex items-center gap-2 hover:border-slate-300">
+            <span class="material-icons text-[18px]">arrow_back</span>Panel
+          </a>
+          {% if puede_crear_salida %}
+          <a href="{% url 'crear_salida' %}" class="h-10 px-4 rounded-xl bg-slate-900 text-white text-sm font-bold inline-flex items-center gap-2 hover:bg-slate-800">
+            <span class="material-icons text-[18px]">add</span>Nueva salida
+          </a>
+          {% endif %}
+          {% if puede_gestionar_salidas %}
+          <form method="post" action="{% url 'limpiar_salidas_vacias' %}" onsubmit="return confirm('Eliminar salidas vacias?');">
+            {% csrf_token %}
+            <button type="submit" class="h-10 px-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm font-bold inline-flex items-center gap-2 hover:bg-rose-100">
+              <span class="material-icons text-[18px]">auto_delete</span>Limpiar vacias
+            </button>
+          </form>
+          {% endif %}
+          {% if not puede_crear_salida and not puede_gestionar_salidas %}
+          <span class="h-10 px-4 rounded-xl bg-slate-100 text-slate-500 text-xs font-bold inline-flex items-center">Solo lectura</span>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <article class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 font-black">Salidas visibles</p>
+        <p class="text-3xl font-black text-slate-900 mt-2">{{ salidas|length }}</p>
+      </article>
+      <article class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 font-black">Filtro de fecha</p>
+        <p class="text-sm font-bold text-slate-900 mt-2">{% if fecha_filtro %}{{ fecha_filtro }}{% else %}Sin filtro{% endif %}</p>
+      </article>
+      <article class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 font-black">Estado del modulo</p>
+        <p class="text-sm font-bold mt-2 {% if solo_lectura %}text-amber-700{% else %}text-emerald-700{% endif %}">{% if solo_lectura %}Solo lectura{% else %}Gestion completa{% endif %}</p>
+      </article>
+    </section>
+
+    <section class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+      <form method="get" class="flex flex-wrap items-center gap-2">
+        <input type="date" name="fecha" value="{{ fecha_filtro|default:'' }}" class="h-10 px-3 rounded-xl border border-slate-300 text-sm font-semibold text-slate-700">
+        <button type="submit" class="h-10 px-4 rounded-xl bg-slate-900 text-white text-sm font-bold">Filtrar</button>
+        {% if fecha_filtro %}
+        <a href="{% url 'admin_salidas' %}" class="h-10 px-4 rounded-xl bg-slate-100 text-slate-700 text-sm font-bold inline-flex items-center">Quitar</a>
         {% endif %}
+      </form>
+    </section>
 
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
-            <div>
-                <h1 class="text-3xl font-black text-slate-900 tracking-tight">Salidas y <span
-                        class="text-primary">Cupos</span></h1>
-                <p class="text-slate-500 mt-1">Monitoreo de disponibilidad y programación de fechas.</p>
-            </div>
-
-            <div class="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-                <!-- Filtro por Fecha -->
-                <form method="get" class="flex gap-2 items-center w-full md:w-auto">
-                    <input type="date" name="fecha" value="{{ fecha_filtro|default:'' }}"
-                        class="flex-1 md:flex-none px-4 py-2.5 bg-white border border-slate-200 rounded-xl shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none font-semibold text-slate-700 text-sm">
-                    <button type="submit"
-                        class="bg-slate-900 text-white p-2.5 rounded-xl hover:bg-primary transition-all shadow-sm">
-                        <span class="material-icons text-sm">filter_alt</span>
-                    </button>
-                    {% if fecha_filtro %}
-                    <a href="{% url 'admin_salidas' %}"
-                        class="bg-slate-100 text-slate-500 p-2.5 rounded-xl hover:bg-slate-200 transition-all">
-                        <span class="material-icons text-sm">close</span>
-                    </a>
-                    {% endif %}
-                </form>
-
-                <div class="flex items-center gap-3 w-full md:w-auto">
-                    <a href="{% url 'panel_admin' %}"
-                        class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-primary hover:border-primary/30 transition-all duration-300 font-bold text-sm shadow-sm">
-                        <span class="material-icons text-base">arrow_back</span>
-                    </a>
-                    {% if puede_crear_salida %}
-                    <a href="{% url 'crear_salida' %}"
-                        class="flex-1 md:flex-none bg-slate-900 hover:bg-primary text-white px-6 py-3 rounded-xl font-bold transition shadow-lg shadow-slate-900/10 flex items-center gap-2 text-sm uppercase tracking-wider">
-                        <span class="material-icons">add_circle</span> Nueva Salida
-                    </a>
-                    {% endif %}
-                    {% if puede_gestionar_salidas %}
-                    <form method="post" action="{% url 'limpiar_salidas_vacias' %}" class="inline"
-                        onsubmit="return confirm('¿Seguro que quieres eliminar todas las salidas que NO tienen ni una reserva? Esta acción limpiará el catálogo de fechas vacías.');">
-                        {% csrf_token %}
-                        <button type="submit"
-                            class="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-3 rounded-xl font-bold transition border border-red-100 flex items-center gap-2 text-xs uppercase tracking-wider"
-                            title="Limpiar salidas vacias">
-                            <span class="material-icons text-sm">auto_delete</span>
-                        </button>
-                    </form>
-                    {% endif %}
-                    {% if not puede_crear_salida and not puede_gestionar_salidas %}
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Solo lectura</span>
-                    {% endif %}
+    <section class="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-950 text-white text-[10px] uppercase tracking-[0.16em]">
+            <tr>
+              <th class="px-6 py-4 text-left">Tour</th>
+              <th class="px-6 py-4 text-left">Fecha</th>
+              <th class="px-6 py-4 text-left">Disponibilidad</th>
+              <th class="px-6 py-4 text-left">Cupos</th>
+              <th class="px-6 py-4 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for s in salidas %}
+            <tr class="hover:bg-slate-50">
+              <td class="px-6 py-4 font-bold text-slate-900">{{ s.tour.nombre }}</td>
+              <td class="px-6 py-4">
+                <p class="font-semibold text-slate-900">{{ s.fecha|date:"d/m/Y" }}</p>
+                <p class="text-xs text-slate-500">ID #{{ s.id }}</p>
+              </td>
+              <td class="px-6 py-4 min-w-[220px]">
+                <div class="flex items-center justify-between text-xs font-bold mb-1">
+                  <span class="text-slate-500">Libres</span>
+                  <span class="{% if s.cupos_disponibles < 5 %}text-rose-600{% else %}text-emerald-700{% endif %}">{{ s.cupos_disponibles }}</span>
                 </div>
-            </div>
-        </div>
-
-        <div class="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-slate-900 text-white text-[10px] uppercase tracking-[0.2em]">
-                            <th class="px-8 py-6">Tour Programado</th>
-                            <th class="px-8 py-6">Fecha de Salida</th>
-                            <th class="px-8 py-6">Estado de Ocupación</th>
-                            <th class="px-8 py-6 text-center">Cupos</th>
-                            <th class="px-8 py-6 text-right">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        {% for s in salidas %}
-                        <tr class="group hover:bg-slate-50/80 transition-all duration-300">
-                            <td class="px-8 py-5">
-                                <div class="flex items-center gap-3">
-                                    <div
-                                        class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-all">
-                                        <span class="material-icons">map</span>
-                                    </div>
-                                    <span class="text-slate-700 font-bold text-sm">{{ s.tour.nombre }}</span>
-                                </div>
-                            </td>
-
-                            <td class="px-8 py-5">
-                                <div class="flex flex-col">
-                                    <span class="text-slate-700 font-bold text-sm">{{ s.fecha|date:"D, d M Y" }}</span>
-                                    <span class="text-slate-400 text-[10px] font-black uppercase tracking-tighter">ID:
-                                        #{{ s.id }}</span>
-                                </div>
-                            </td>
-
-                            <td class="px-8 py-5 w-72">
-                                <div class="flex flex-col gap-1.5">
-                                    <div class="flex justify-between text-[10px] font-black uppercase">
-                                        <span class="text-slate-400">Ocupación</span>
-                                        <span
-                                            class="{% if s.cupos_disponibles < 5 %}text-red-500 animate-pulse{% else %}text-emerald-600{% endif %}">
-                                            {{ s.cupos_disponibles }} Libres
-                                        </span>
-                                    </div>
-                                    <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
-                                        <div class="bg-primary h-full rounded-full transition-all duration-1000"
-                                            style="width: calc((({{ s.cupo_maximo }} - {{ s.cupos_disponibles }}) / {{ s.cupo_maximo }}) * 100%)">
-                                        </div>
-                                    </div>
-                                </div>
-                            </td>
-
-                            <td class="px-8 py-5 text-center">
-                                <span
-                                    class="bg-slate-100 text-slate-700 px-3 py-1 rounded-lg font-mono text-xs font-bold border border-slate-200">
-                                    {{ s.cupos_disponibles }}/{{ s.cupo_maximo }}
-                                </span>
-                            </td>
-
-                            <td class="px-8 py-5 text-right">
-                                <div class="flex justify-end gap-2">
-                                    {% if not solo_lectura %}
-                                    <a href="{% url 'editar_salida' s.id %}"
-                                        class="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                                        title="Editar Salida">
-                                        <span class="material-icons text-xl">edit</span>
-                                    </a>
-                                    <form method="post" action="{% url 'eliminar_salida' s.id %}" class="inline"
-                                        onsubmit="return confirm('¿Estás seguro de eliminar esta salida? Esta acción no se puede deshacer.');">
-                                        {% csrf_token %}
-                                        <button type="submit"
-                                            class="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                            title="Eliminar Salida">
-                                            <span class="material-icons text-xl">delete</span>
-                                        </button>
-                                    </form>
-                                    {% else %}
-                                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Solo lectura</span>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="px-8 py-24 text-center">
-                                <div class="flex flex-col items-center">
-                                    <span class="material-icons text-6xl text-slate-100 mb-4">calendar_today</span>
-                                    <p class="text-slate-400 font-bold italic">No hay fechas programadas actualmente.
-                                    </p>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="mt-8 flex gap-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">
-            <div class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-primary"></span> Progreso de Ventas
-            </div>
-            <div class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]"></span> Alerta de
-                cupos bajos
-            </div>
-        </div>
-
-    </div>
+                <div class="h-2 rounded-full bg-slate-200 overflow-hidden">
+                  <div class="h-full rounded-full {% if s.cupos_disponibles < 5 %}bg-rose-500{% else %}bg-emerald-500{% endif %}" style="width: calc((({{ s.cupo_maximo }} - {{ s.cupos_disponibles }}) / {{ s.cupo_maximo|default:1 }}) * 100%)"></div>
+                </div>
+              </td>
+              <td class="px-6 py-4 font-mono text-slate-700">{{ s.cupos_disponibles }}/{{ s.cupo_maximo }}</td>
+              <td class="px-6 py-4 text-right">
+                {% if not solo_lectura %}
+                <div class="inline-flex items-center gap-2">
+                  <a href="{% url 'editar_salida' s.id %}" class="h-9 w-9 rounded-lg bg-slate-100 text-slate-600 inline-flex items-center justify-center hover:bg-blue-50 hover:text-blue-600" title="Editar">
+                    <span class="material-icons text-[18px]">edit</span>
+                  </a>
+                  <form method="post" action="{% url 'eliminar_salida' s.id %}" class="inline" onsubmit="return confirm('Eliminar esta salida?');">
+                    {% csrf_token %}
+                    <button type="submit" class="h-9 w-9 rounded-lg bg-slate-100 text-slate-600 inline-flex items-center justify-center hover:bg-rose-50 hover:text-rose-600" title="Eliminar">
+                      <span class="material-icons text-[18px]">delete</span>
+                    </button>
+                  </form>
+                </div>
+                {% else %}
+                <span class="text-xs font-bold text-slate-400">Solo lectura</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="px-6 py-14 text-center text-slate-500">No hay salidas registradas.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
 </div>
-
-<style>
-    @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
-
-    /* Variables de color para asegurar consistencia */
-    :root {
-        --primary-color: #13B6EC;
-        /* Asegúrate que este sea el mismo de tu Panel Admin */
-    }
-
-    .text-primary {
-        color: var(--primary-color);
-    }
-
-    .bg-primary {
-        background-color: var(--primary-color);
-    }
-
-    .hover\:text-primary:hover {
-        color: var(--primary-color);
-    }
-
-    .hover\:bg-primary:hover {
-        background-color: var(--primary-color);
-    }
-
-    .hover\:border-primary\/30:hover {
-        border-color: rgba(255, 90, 95, 0.3);
-    }
-
-    .shadow-primary\/20 {
-        shadow-color: rgba(255, 90, 95, 0.2);
-    }
-</style>
 {% endblock %}
-

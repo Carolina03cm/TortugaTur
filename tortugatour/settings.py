@@ -43,11 +43,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-dev-only-key")
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 
-def _parse_csv(raw):
-    return [item.strip() for item in (raw or "").split(",") if item.strip()]
-
-
-ALLOWED_HOSTS = ['tortugatourec.pythonanywhere.com']
+ALLOWED_HOSTS = ['tortugatourec.pythonanywhere.com','*']
 
 # Application definition
 
@@ -166,6 +162,9 @@ LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'home'
 LOGIN_URL = '/login/'
 
+# Cerrar sesión al cerrar el navegador (evita sesión persistente local)
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
 # pagos
 SITE_URL = os.getenv("SITE_URL", "http://127.0.0.1:8000")
 PAYMENT_DEFAULT_CURRENCY = os.getenv("PAYMENT_DEFAULT_CURRENCY", "USD")
@@ -205,4 +204,3 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # touch 2026-02-21 17:19:47.751364
-

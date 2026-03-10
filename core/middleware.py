@@ -1,5 +1,7 @@
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.conf import settings
+from .models import UserProfile
 
 
 class ForcePasswordChangeMiddleware:
@@ -16,28 +18,20 @@ class ForcePasswordChangeMiddleware:
         logout_url = reverse("logout")
         home_url = reverse("home")
         panel_url = reverse("panel_admin")
-
+        perfil_url = reverse("perfil_admin")
         user = getattr(request, "user", None)
         if user and user.is_authenticated:
             if request.path == login_url:
-                if user.is_superuser or user.is_staff or user.groups.filter(name__iexact="secretaria").exists():
+                if user.is_staff or user.is_superuser:
                     return redirect(panel_url)
                 return redirect(home_url)
-
-            try:
-                perfil = user.perfil
-            except Exception:
-                perfil = None
-
-            if perfil and getattr(perfil, "force_password_change", False):
-                perfil_url = reverse("perfil_admin")
-                allowed = {
-                    perfil_url,
-                    logout_url,
-                    login_url,
-                }
-                if request.path not in allowed:
-                    return redirect("perfil_admin")
+            if request.path not in {perfil_url, logout_url}:
+                static_url = getattr(settings, "STATIC_URL", "/static/")
+                media_url = getattr(settings, "MEDIA_URL", "/media/")
+                if not (request.path.startswith(static_url) or request.path.startswith(media_url)):
+                    force_change = UserProfile.objects.filter(user=user).values_list("force_password_change", flat=True).first()
+                    if force_change:
+                        return redirect(perfil_url)
 
         response = self.get_response(request)
 

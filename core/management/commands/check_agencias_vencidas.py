@@ -3,7 +3,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
-from core.models import Reserva, SalidaTour
+from core.models import Reserva
 
 logger = logging.getLogger(__name__)
 
