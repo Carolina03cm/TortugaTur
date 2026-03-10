@@ -2110,7 +2110,6 @@ def crear_salida(request):
         duracion = request.POST.get("duracion")
         
         tour = get_object_or_404(Tour, id=tour_id)
-        horas_definidas = [h for h in [tour.hora_turno_1, tour.hora_turno_2] if h]
         
         from datetime import datetime
         fecha_inicio = datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date()
@@ -2127,18 +2126,10 @@ def crear_salida(request):
             # Turnos a crear
             horas = []
             if es_secretaria_user:
-                if not horas_definidas:
-                    messages.error(request, "Este tour no tiene horarios definidos por el admin.")
+                if not hora_post:
+                    messages.error(request, "Debes ingresar la hora de inicio del tour.")
                     return redirect("crear_salida")
-                if hora_post:
-                    horas_validas = {h.strftime("%H:%M") for h in horas_definidas}
-                    if hora_post not in horas_validas:
-                        messages.error(request, "Selecciona un horario definido por el admin.")
-                        return redirect("crear_salida")
-                    horas.append(hora_post)
-                else:
-                    messages.error(request, "Debes seleccionar un horario definido por el admin.")
-                    return redirect("crear_salida")
+                horas.append(hora_post)
             else:
                 if ambos_turnos:
                     if tour.hora_turno_1: horas.append(tour.hora_turno_1)
@@ -4135,7 +4126,7 @@ def secretaria_reservar(request):
                 portada_map[g.tour_id] = g.obtener_imagen_url()
 
     for tour in todos_los_tours:
-        tour.imagen_portada = portada_map.get(tour.id, "")
+        tour.imagen_portada = portada_map.get(tour.id, "") or (getattr(getattr(tour, "destino", None), "imagen_url", "") or "")
     def _attach_child_prices(t):
         t.child_price_0_2 = _precio_nino_por_edad(0, tour=t, user=request.user)
         t.child_price_3_5 = _precio_nino_por_edad(4, tour=t, user=request.user)
@@ -4145,10 +4136,10 @@ def secretaria_reservar(request):
     for tour in todos_los_tours:
         _attach_child_prices(tour)
     for tour in list(tours_con_salidas.keys()):
-        tour.imagen_portada = portada_map.get(tour.id, "")
+        tour.imagen_portada = portada_map.get(tour.id, "") or (getattr(getattr(tour, "destino", None), "imagen_url", "") or "")
         _attach_child_prices(tour)
     for tour in list(tours_reserva_directa.keys()):
-        tour.imagen_portada = portada_map.get(tour.id, "")
+        tour.imagen_portada = portada_map.get(tour.id, "") or (getattr(getattr(tour, "destino", None), "imagen_url", "") or "")
         _attach_child_prices(tour)
 
     return render(

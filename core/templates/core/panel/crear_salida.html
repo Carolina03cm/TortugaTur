@@ -1,4 +1,4 @@
-{% extends "core/base.html" %}
+﻿{% extends "core/base.html" %}
 {% block title %}Programar Nueva Salida | TortugaTur{% endblock %}
 
 {% block content %}
@@ -46,9 +46,7 @@
                             <option value="" disabled selected>Elige un tour de la lista...</option>
                             {% for t in tours %}
                             <option value="{{ t.id }}" data-cupo="{{ t.cupo_maximo }}"
-                                data-duracion="{{ t.duracion|default:'' }}"
-                                data-hora1="{% if t.hora_turno_1 %}{{ t.hora_turno_1|time:'H:i' }}{% endif %}"
-                                data-hora2="{% if t.hora_turno_2 %}{{ t.hora_turno_2|time:'H:i' }}{% endif %}">{{ t.nombre }} — {{ t.destino.nombre }}
+                                data-duracion="{{ t.duracion|default:'' }}">{{ t.nombre }} — {{ t.destino.nombre }}
                             </option>
                             {% endfor %}
                         </select>
@@ -58,25 +56,42 @@
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-[11px] uppercase tracking-wider font-black text-slate-400 mb-2">Fecha
+                            Inicio (o fecha única)</label>
+                        <div class="relative">
+                            <span class="material-icons absolute left-3 top-3 text-slate-400">calendar_today</span>
+                            <input type="date" name="fecha" required
+                                class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition text-slate-700">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] uppercase tracking-wider font-black text-slate-400 mb-2">Fecha
+                            Fin (Opcional para rango)</label>
+                        <div class="relative">
+                            <span class="material-icons absolute left-3 top-3 text-slate-400">event_repeat</span>
+                            <input type="date" name="fecha_fin"
+                                class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition text-slate-700">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
     {% if es_secretaria %}
     <div>
-        <label class="block text-[11px] uppercase tracking-wider font-black text-slate-400 mb-2">
-            Horario (definido por admin)
-        </label>
+        <label class="block text-[11px] uppercase tracking-wider font-black text-slate-400 mb-2">Hora de
+            Inicio (definida por secretaria)</label>
         <div class="relative">
             <span class="material-icons absolute left-3 top-3 text-slate-400">schedule</span>
-            <select name="hora" id="horaSelect" required
+            <input type="time" name="hora" required
                 class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none transition text-slate-700">
-                <option value="" disabled selected>Selecciona un horario...</option>
-            </select>
         </div>
-        <p class="text-[10px] text-slate-400 font-bold mt-2">Solo puedes usar horarios definidos por el admin.</p>
     </div>
     <div class="hidden md:block"></div>
     {% else %}
     <div>
         <label class="block text-[11px] uppercase tracking-wider font-black text-slate-400 mb-2">Hora de
-            Inicio (Si es fecha única o manual)</label>
+            Inicio (Si es fecha �nica o manual)</label>
         <div class="relative">
             <span class="material-icons absolute left-3 top-3 text-slate-400">schedule</span>
             <input type="time" name="hora"
@@ -90,7 +105,7 @@
             <label for="ambosTurnos" class="text-sm font-black text-slate-700 cursor-pointer">CREAR
                 TURNOS DEL TOUR</label>
             <p class="text-[10px] text-slate-400 font-bold">Usa los horarios predefinidos del tour
-                (Mañana/Tarde)</p>
+                (Ma�ana/Tarde)</p>
         </div>
     </div>
     {% endif %}
@@ -154,21 +169,34 @@
 </div>
 
 <script>
-    // Script para cargar automáticamente el cupo máximo desde el tour seleccionado
-    document.addEventListener('DOMContentLoaded', function () {
+    // Script para cargar autom�ticamente el cupo m�ximo desde el tour seleccionado
+    document.addEventListener("DOMContentLoaded", function () {
         const tourSelect = document.getElementById('tourSelect');
         const cupoInput = document.getElementById('cupoMaximo');
-        const horaSelect = document.getElementById('horaSelect');
         const cupoContainer = document.getElementById('cupoContainer');
         const cupoInfo = document.getElementById('cupoSourceInfo');
+        const fechaInicioInput = document.querySelector('input[name="fecha"]');
+        const fechaFinInput = document.querySelector('input[name="fecha_fin"]');
 
-        // Función para actualizar el cupo máximo cuando se selecciona un tour
+        const syncFechaFin = () => {
+            if (!fechaInicioInput || !fechaFinInput) return;
+            const inicio = fechaInicioInput.value;
+            const fin = fechaFinInput.value;
+            if (!inicio) return;
+            if (!fin || fin < inicio) {
+                fechaFinInput.value = inicio;
+            }
+        };
+
+        fechaInicioInput && fechaInicioInput.addEventListener('change', syncFechaFin);
+        fechaFinInput && fechaFinInput.addEventListener('change', syncFechaFin);
+        syncFechaFin();
+
+        // Funci�n para actualizar el cupo m�ximo cuando se selecciona un tour
         tourSelect.addEventListener('change', function () {
             const selectedOption = this.options[this.selectedIndex];
             const tourCupo = selectedOption.getAttribute('data-cupo');
             const tourDuracion = selectedOption.getAttribute('data-duracion');
-            const hora1 = selectedOption.getAttribute('data-hora1');
-            const hora2 = selectedOption.getAttribute('data-hora2');
             const duracionInput = document.getElementById('duracionTour');
             const duracionContainer = document.getElementById('duracionContainer');
 
@@ -181,10 +209,10 @@
             }
 
             if (tourCupo) {
-                // Establece el valor del cupo máximo desde el tour
+                // Establece el valor del cupo m�ximo desde el tour
                 cupoInput.value = tourCupo;
 
-                // Añade un efecto visual para indicar que el valor se cargó automáticamente
+                // A�ade un efecto visual para indicar que el valor se carg� autom�ticamente
                 cupoContainer.classList.add('bg-primary/5', 'rounded-xl', 'p-3');
                 setTimeout(() => {
                     cupoContainer.classList.remove('bg-primary/5', 'p-3');
@@ -196,31 +224,19 @@
                 cupoInput.value = '';
                 cupoInfo.classList.add('hidden');
             }
-
-            if (horaSelect) {
-                horaSelect.innerHTML = '<option value="" disabled selected>Selecciona un horario...</option>';
-                const horas = [hora1, hora2].filter(Boolean);
-                horas.forEach((h) => {
-                    const opt = document.createElement('option');
-                    opt.value = h;
-                    opt.textContent = h;
-                    horaSelect.appendChild(opt);
-                });
-                horaSelect.disabled = horas.length === 0;
-            }
         });
 
-        // Validación del formulario
+        // Validaci�n del formulario
         document.getElementById('salidaForm').addEventListener('submit', function (event) {
             if (!tourSelect.value) {
                 event.preventDefault();
                 alert('Por favor, selecciona un tour antes de continuar.');
             }
-\n            if (horaSelect && !horaSelect.value) {\r\n                event.preventDefault();\r\n                alert('Selecciona un horario definido por el admin.');\r\n            }\r\n\r\n
+
             const cupoValue = parseInt(cupoInput.value);
             if (isNaN(cupoValue) || cupoValue < 1) {
                 event.preventDefault();
-                alert('El cupo máximo debe ser un número mayor que cero.');
+                alert('El cupo m�ximo debe ser un n�mero mayor que cero.');
             }
         });
     });
@@ -261,5 +277,9 @@
     }
 </style>
 {% endblock %}
+
+
+
+
 
 
