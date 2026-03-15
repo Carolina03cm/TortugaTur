@@ -23,7 +23,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.views.decorators.cache import never_cache
 from django.db import transaction
-from django.db.models import Q, Sum, Count
+from django.db.models import Q, Sum, Count, Max
 from django.core.paginator import Paginator
 from collections import defaultdict
 import re
@@ -4470,6 +4470,7 @@ def secretaria_reservar(request):
         return redirect(checkout_url)
 
     # Imagen de portada por tour para vista de reserva asistida.
+    # Prioriza la imagen del destino (configurada al crear el destino).
     tour_ids = {t.id for t in todos_los_tours}
     tour_ids.update({t.id for t in tours_con_salidas.keys()})
     tour_ids.update({t.id for t in tours_reserva_directa.keys()})
@@ -4485,7 +4486,8 @@ def secretaria_reservar(request):
                 portada_map[g.tour_id] = g.obtener_imagen_url()
 
     for tour in todos_los_tours:
-        tour.imagen_portada = portada_map.get(tour.id, "") or (getattr(getattr(tour, "destino", None), "imagen_url", "") or "")
+        destino_img = getattr(getattr(tour, "destino", None), "imagen_url", "") or ""
+        tour.imagen_portada = destino_img or portada_map.get(tour.id, "")
     def _attach_child_prices(t):
         t.child_price_0_2 = _precio_nino_por_edad(0, tour=t, user=request.user)
         t.child_price_3_5 = _precio_nino_por_edad(4, tour=t, user=request.user)
@@ -4495,11 +4497,74 @@ def secretaria_reservar(request):
     for tour in todos_los_tours:
         _attach_child_prices(tour)
     for tour in list(tours_con_salidas.keys()):
-        tour.imagen_portada = portada_map.get(tour.id, "") or (getattr(getattr(tour, "destino", None), "imagen_url", "") or "")
+        destino_img = getattr(getattr(tour, "destino", None), "imagen_url", "") or ""
+        tour.imagen_portada = destino_img or portada_map.get(tour.id, "")
         _attach_child_prices(tour)
     for tour in list(tours_reserva_directa.keys()):
-        tour.imagen_portada = portada_map.get(tour.id, "") or (getattr(getattr(tour, "destino", None), "imagen_url", "") or "")
+        destino_img = getattr(getattr(tour, "destino", None), "imagen_url", "") or ""
+        tour.imagen_portada = destino_img or portada_map.get(tour.id, "")
         _attach_child_prices(tour)
+
+    # Calendario de disponibilidad (90 días) con tours visibles por día.
+    calendar_hoy = timezone.localdate()
+    calendar_hasta = calendar_hoy + timedelta(days=90)
+    salidas_calendar = (
+        SalidaTour.objects.filter(fecha__range=[calendar_hoy, calendar_hasta])
+        .values("fecha", "tour_id", "tour__nombre")
+        .annotate(
+            total_cupos=Sum("cupos_disponibles"),
+            max_cupos=Max("cupos_disponibles"),
+            total_salidas=Count("id"),
+        )
+        .order_by("fecha", "tour__nombre")
+    )
+    salidas_calendar_days = (
+        SalidaTour.objects.filter(fecha__range=[calendar_hoy, calendar_hasta])
+        .values("fecha")
+        .annotate(
+            total_cupos=Sum("cupos_disponibles"),
+            max_cupos=Max("cupos_disponibles"),
+            total_salidas=Count("id"),
+        )
+        .order_by("fecha")
+    )
+    calendar_events = []
+    for s in salidas_calendar:
+        total_cupos = int(s.get("total_cupos") or 0)
+        if total_cupos <= 0:
+            continue
+        max_cupos = int(s.get("max_cupos") or 0)
+        color = "#22c55e" if max_cupos > 3 else "#f59e0b"
+        tour_name = s.get("tour__nombre") or "Tour"
+        calendar_events.append({
+            "title": f"{tour_name} · {total_cupos} cupos",
+            "start": s["fecha"].isoformat(),
+            "allDay": True,
+            "backgroundColor": color,
+            "borderColor": color,
+            "textColor": "#0f172a",
+        })
+    # Background availability per day (green/amber/red/gray).
+    day_map = {d["fecha"]: d for d in salidas_calendar_days}
+    cursor = calendar_hoy
+    while cursor <= calendar_hasta:
+        info = day_map.get(cursor)
+        if not info:
+            bg = "#e2e8f0"  # no tours
+        else:
+            total_cupos = int(info.get("total_cupos") or 0)
+            if total_cupos <= 0:
+                bg = "#ef4444"  # sin cupos
+            else:
+                max_cupos = int(info.get("max_cupos") or 0)
+                bg = "#22c55e" if max_cupos > 3 else "#f59e0b"
+        calendar_events.append({
+            "start": cursor.isoformat(),
+            "allDay": True,
+            "display": "background",
+            "backgroundColor": bg,
+        })
+        cursor += timedelta(days=1)
 
     return render(
         request,
@@ -4514,6 +4579,7 @@ def secretaria_reservar(request):
             "fecha_busqueda_display": fecha_display,
             "destino_seleccionado": destino_seleccionado,
             "fecha_hoy_iso": fecha_hoy.isoformat(),
+            "salidas_calendar_json": json.dumps(calendar_events),
         },
     )
 
