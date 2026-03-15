@@ -1,0 +1,182 @@
+{% extends "core/base.html" %}
+{% block title %}Agencias sin pago | TortugaTur{% endblock %}
+
+{% block content %}
+
+<div class="bg-slate-100 min-h-screen py-8 relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        <!-- HEADER -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+                    Agencias sin pago
+                </h1>
+                <p class="text-slate-500 text-[11px] font-bold uppercase tracking-[0.16em] mt-1">
+                    Reservas recientes sin pago registrado
+                </p>
+            </div>
+
+            <a href="{% url 'panel_admin' %}"
+                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all font-bold text-sm shadow-sm">
+                <span class="material-icons text-base">arrow_back</span> Panel
+            </a>
+        </div>
+
+        <!-- ACCIONES + BUSCADOR -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-6">
+            <form method="post" class="w-full lg:w-auto">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="enviar_recordatorios">
+                <button type="submit"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-all font-bold text-sm shadow-sm">
+                    <span class="material-icons text-base">send</span> Enviar recordatorios
+                </button>
+                <p class="text-[11px] text-slate-500 font-semibold mt-2">
+                    Se enviara a {{ pendientes_envio_count }} reserva(s) recientes sin pago (0-6 dias).
+                </p>
+            </form>
+            <div class="relative group w-full lg:w-80">
+                <span
+                    class="material-icons absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary">search</span>
+                <input type="text" id="reservaSearch" placeholder="Buscar agencia, pasajero o tour..."
+                    class="pl-12 pr-6 py-3 bg-white border border-slate-200 rounded-xl w-full shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none font-semibold text-slate-700 text-sm"
+                    onkeyup="filterReservas()">
+            </div>
+        </div>
+
+        <!-- TABLA -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse" id="tabla-reservas">
+                    <thead class="bg-slate-950 text-white text-[10px] uppercase tracking-[0.2em]">
+                        <tr>
+                            <th class="px-8 py-7">Ref.</th>
+                            <th class="px-8 py-7">Agencia / Pasajero</th>
+                            <th class="px-8 py-7">Tour</th>
+                            <th class="px-8 py-7">Fecha</th>
+                            <th class="px-8 py-7">Dias sin pago</th>
+                            <th class="px-8 py-7">Total</th>
+                            <th class="px-8 py-7 text-center">Alerta 7d</th>
+                            <th class="px-8 py-7 text-center">Estado</th>
+                            <th class="px-8 py-7 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-50 text-sm">
+                        {% for r in reservas %}
+                        <tr class="reserva-row hover:bg-slate-50">
+                            <td class="px-8 py-6 text-slate-400 font-mono">
+                                #{{ r.id|stringformat:"05d" }}
+                            </td>
+                            <td class="px-8 py-6 font-bold">
+                                <div class="flex items-start gap-2">
+                                    <span class="material-icons text-sm text-slate-400 mt-0.5">business_center</span>
+                                    <div>
+                                        <div>{{ r.agencia_nombre|default:"Agencia" }}</div>
+                                        <div class="text-xs text-slate-500 font-semibold">{{ r.nombre }} {{ r.apellidos }}</div>
+                                        {% if r.agencia_correo %}
+                                        <div class="text-xs text-slate-400 font-semibold">{{ r.agencia_correo }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-8 py-6 italic tour-nombre">{{ r.salida.tour.nombre }}</td>
+                            <td class="px-8 py-6 text-slate-500 text-sm">{{ r.fecha_reserva|date:"d M Y" }}</td>
+                            <td class="px-8 py-6 font-bold">{{ r.dias_sin_pago }}</td>
+                            <td class="px-8 py-6 font-bold monto-total">${{ r.total_pagar }}</td>
+                            <td class="px-8 py-6 text-center text-xs font-bold">
+                                {% if r.alerta_7d_agencia_enviada_en %}
+                                <span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-1 rounded-lg">
+                                    Enviado {{ r.alerta_7d_agencia_enviada_en|date:"d M Y H:i" }}
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1 bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">
+                                    No enviado
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-8 py-6 text-center">
+                                <span
+                                    class="estado-label px-3 py-1 rounded-lg text-xs font-bold {% if r.estado == 'cancelada' %}bg-red-100 text-red-700{% elif r.estado == 'pagada' or r.tiene_pago %}bg-green-100 text-green-700{% elif r.estado == 'bloqueada_por_agencia' %}bg-blue-100 text-blue-700{% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                                    {% if r.estado == "pagada" or r.tiene_pago %}pagada{% elif r.estado == "bloqueada_por_agencia" %}bloqueada agencia{% else %}{{ r.estado }}{% endif %}
+                                </span>
+                            </td>
+                            <td class="px-8 py-6 text-center">
+                                {% if r.estado == "solicitud_agencia" %}
+                                <div class="flex flex-col gap-2 min-w-[170px]">
+                                    <form method="post" action="{% url 'gestionar_solicitud_agencia' r.id %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="accion" value="aceptar">
+                                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+                                            Aceptar bloqueo
+                                        </button>
+                                    </form>
+                                    <form method="post" action="{% url 'gestionar_solicitud_agencia' r.id %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="accion" value="rechazar">
+                                        <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+                                            Rechazar
+                                        </button>
+                                    </form>
+                                </div>
+                                {% elif r.estado == "bloqueada_por_agencia" %}
+                                {% if r.total_pagar and r.total_pagar > 0 %}
+                                <form method="post" action="{% url 'registrar_pago_agencia' r.id %}" class="flex items-center gap-2 justify-center min-w-[230px]">
+                                    {% csrf_token %}
+                                    <span class="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-lg">$ {{ r.total_pagar|floatformat:2 }}</span>
+                                    <button type="submit"
+                                        class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+                                        Recibir Pago
+                                    </button>
+                                </form>
+                                {% else %}
+                                <form method="post" action="{% url 'registrar_monto_agencia' r.id %}" class="flex items-center gap-2 justify-center min-w-[230px]">
+                                    {% csrf_token %}
+                                    <input type="number" step="0.01" min="0.01" name="monto_pagado" value=""
+                                        class="w-28 border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold" placeholder="Monto">
+                                    <button type="submit"
+                                        class="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+                                        Registrar monto
+                                    </button>
+                                </form>
+                                {% endif %}
+                                {% elif r.estado == "pagada_total_agencia" or r.estado == "pagada" or r.tiene_pago %}
+                                <a href="{% url 'ver_ticket_pdf' r.id %}" target="_blank"
+                                    class="inline-flex items-center bg-indigo-600 text-white px-3 py-1 rounded-lg text-xs font-bold">Ver PDF</a>
+                                {% else %}
+                                <span class="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-xs font-bold">
+                                    En gestion
+                                </span>
+                                {% endif %}
+
+                                <form method="post" class="mt-2">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="accion" value="enviar_uno">
+                                    <input type="hidden" name="reserva_id" value="{{ r.id }}">
+                                    <button type="submit"
+                                        class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded-md text-[11px] font-bold">
+                                        Enviar correo
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    function filterReservas() {
+        const filter = document.getElementById('reservaSearch').value.toLowerCase();
+        const rows = document.getElementsByClassName('reserva-row');
+        for (let row of rows) {
+            row.style.display = row.textContent.toLowerCase().includes(filter) ? "" : "none";
+        }
+    }
+</script>
+
+{% endblock %}

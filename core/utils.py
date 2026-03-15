@@ -70,7 +70,18 @@ def generar_ticket_pdf(reserva, empresa=None):
     hora_salida = reserva.salida.hora.strftime("%I:%M %p") if reserva.salida.hora else "Por definir"
     fecha_emision = reserva.fecha_reserva.strftime("%d/%m/%Y %I:%M %p")
     clave_acceso = _access_key(reserva, empresa_ruc)
-    estado_text = (reserva.estado or "pendiente").upper()
+    estado_raw = (reserva.estado or "pendiente").lower()
+    if _es_reserva_agencia(reserva):
+        estado_text = estado_raw.upper()
+    else:
+        if estado_raw in {"pagada", "confirmada"}:
+            estado_text = "CONFIRMADA"
+        elif estado_raw == "pendiente":
+            estado_text = "PENDIENTE DE PAGO"
+        elif estado_raw == "cancelada":
+            estado_text = "CANCELADA"
+        else:
+            estado_text = estado_raw.upper()
 
     # Header
     p.setFillColor(color_primary)
@@ -277,6 +288,154 @@ def generar_ticket_pdf(reserva, empresa=None):
 
     p.showPage()
     p.save()
+    buffer.seek(0)
+    return buffer
+
+
+def generar_factura_agencia_mensual_pdf(agencia_nombre, reservas, periodo_label, empresa=None):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=34,
+        rightMargin=34,
+        topMargin=36,
+        bottomMargin=36,
+    )
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        "title",
+        parent=styles["Heading1"],
+        textColor=colors.white,
+        fontSize=16,
+        leading=18,
+        alignment=0,
+    )
+    subtitle_style = ParagraphStyle(
+        "subtitle",
+        parent=styles["Normal"],
+        textColor=colors.HexColor("#E2E8F0"),
+        fontSize=9,
+        alignment=0,
+    )
+    label_style = ParagraphStyle(
+        "label",
+        parent=styles["Normal"],
+        textColor=colors.HexColor("#0F172A"),
+        fontSize=10,
+    )
+    small_label = ParagraphStyle(
+        "small_label",
+        parent=styles["Normal"],
+        textColor=colors.HexColor("#64748B"),
+        fontSize=8,
+    )
+
+    empresa_nombre = "TortugaTur"
+    empresa_ruc = ""
+    empresa_direccion = ""
+    empresa_telefono = ""
+    empresa_correo = ""
+    if empresa is not None:
+        empresa_nombre = getattr(empresa, "nombre_empresa", "") or empresa_nombre
+        empresa_ruc = getattr(empresa, "ruc", "") or ""
+        empresa_direccion = getattr(empresa, "direccion", "") or ""
+        empresa_telefono = getattr(empresa, "telefono", "") or ""
+        empresa_correo = getattr(empresa, "correo", "") or ""
+
+    story = []
+    header_data = [[
+        Paragraph(empresa_nombre.upper(), title_style),
+        Paragraph("FACTURA MENSUAL DE AGENCIA", subtitle_style),
+    ]]
+    header = Table(header_data, colWidths=[290, 230])
+    header.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#0F172A")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 14),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+    ]))
+    story.append(header)
+    story.append(Spacer(1, 10))
+
+    info_left = [
+        Paragraph(f"<b>Periodo:</b> {_safe_text(periodo_label)}", label_style),
+        Paragraph(f"<b>Agencia:</b> {_safe_text(agencia_nombre)}", label_style),
+    ]
+    info_right = [
+        Paragraph(f"<b>RUC:</b> {_safe_text(empresa_ruc, 'No configurado')}", label_style),
+        Paragraph(f"<b>Direccion:</b> {_safe_text(empresa_direccion)}", label_style),
+        Paragraph(f"<b>Telefono:</b> {_safe_text(empresa_telefono)}", label_style),
+        Paragraph(f"<b>Correo:</b> {_safe_text(empresa_correo)}", label_style),
+    ]
+    info_table = Table([[info_left, info_right]], colWidths=[260, 260])
+    info_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+        ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#CBD5E1")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 12))
+
+    data = [
+        ["Voucher", "Tour", "Fecha salida", "Pasajeros", "Monto"],
+    ]
+    total = Decimal("0.00")
+    for r in reservas:
+        tour_nombre = getattr(getattr(r.salida, "tour", None), "nombre", "Tour")
+        fecha_salida = r.salida.fecha.strftime("%d/%m/%Y") if r.salida and r.salida.fecha else "-"
+        pasajeros = f"{r.adultos + r.ninos}"
+        monto = r.total_pagar or Decimal("0.00")
+        total += monto
+        data.append([f"#{r.id:05d}", tour_nombre, fecha_salida, pasajeros, f"${monto}"])
+
+    table = Table(data, colWidths=[70, 210, 90, 70, 70])
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 9),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("FONTSIZE", (0, 1), (-1, -1), 9),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#F8FAFC"), colors.white]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
+    story.append(table)
+    story.append(Spacer(1, 12))
+    total_box = Table(
+        [[Paragraph("Total pendiente", small_label), Paragraph(f"${total}", ParagraphStyle(
+            "total_value",
+            parent=styles["Heading3"],
+            textColor=colors.HexColor("#0F172A"),
+            alignment=2,
+        ))]],
+        colWidths=[120, 120],
+    )
+    total_box.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F1F5F9")),
+        ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#CBD5E1")),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    total_wrap = Table([[ "", total_box ]], colWidths=[280, 240])
+    total_wrap.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+    story.append(total_wrap)
+
+    doc.build(story)
     buffer.seek(0)
     return buffer
 

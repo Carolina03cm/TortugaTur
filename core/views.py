@@ -11,11 +11,12 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth import login, logout
 from django.contrib.auth.models import Group, User
 from django.core.mail import send_mail, EmailMessage, EmailMultiAlternatives
+from django.core.management import call_command
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.utils import timezone
-from datetime import timedelta, datetime, time
+from datetime import timedelta, datetime, time, date
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse, NoReverseMatch
 from django.views.decorators.csrf import csrf_exempt
@@ -29,7 +30,7 @@ import re
 import unicodedata
 from urllib.parse import urlencode
 from .models import Destino, Tour, SalidaTour, Reserva, Pago, Resena, Ticket, EmpresaConfig, Galeria, UserProfile
-from .utils import generar_ticket_pdf, generar_actividad_dia_pdf
+from .utils import generar_ticket_pdf, generar_actividad_dia_pdf, generar_factura_agencia_mensual_pdf
 from .forms import DestinoForm, TourForm, RegistroTuristaForm, ContactoForm, TuristaLoginForm, EmpresaConfigForm
 
 logger = logging.getLogger(__name__)
@@ -88,24 +89,29 @@ def _precio_nino_por_edad(edad_nino, tour=None, user=None):
     return base_price
 
 
-def _calcular_limite_pago_agencia(fecha_salida):
+def _calcular_limite_pago_agencia(fecha_reserva):
     """
-    Regla de pago agencia:
-    - Normal: 15 dias desde hoy.
-    - Excepcion: si la salida es cercana, maximo hasta 1 dia antes de la salida.
+    Regla de recordatorio mensual para agencias:
+    - Recordatorio 7 dias antes de terminar el mes de la reserva.
+    - No existe un limite por salida ni penalizacion por fecha/hora.
     """
-    ahora = timezone.now()
-    limite_estandar = ahora + timedelta(days=15)
+    if isinstance(fecha_reserva, datetime):
+        fecha_ref = fecha_reserva.date()
+    else:
+        fecha_ref = fecha_reserva
 
-    fecha_tope = fecha_salida - timedelta(days=1)
+    if not fecha_ref:
+        fecha_ref = timezone.localdate()
+
+    if fecha_ref.month == 12:
+        first_next_month = date(fecha_ref.year + 1, 1, 1)
+    else:
+        first_next_month = date(fecha_ref.year, fecha_ref.month + 1, 1)
+    last_day = first_next_month - timedelta(days=1)
+    recordatorio_date = last_day - timedelta(days=7)
+
     tz = timezone.get_current_timezone()
-    limite_por_cercania = timezone.make_aware(datetime.combine(fecha_tope, time(23, 59, 59)), tz)
-
-    # Si reservaron demasiado cerca (ej. salida hoy/manana), damos una ventana corta inmediata.
-    if limite_por_cercania <= ahora:
-        return ahora + timedelta(hours=1)
-
-    return min(limite_estandar, limite_por_cercania)
+    return timezone.make_aware(datetime.combine(recordatorio_date, time(23, 59, 59)), tz)
 
 
 def _agenda_actividad(reservas, salidas):
@@ -824,10 +830,15 @@ def panel_admin(request):
             context["panel_profile_url"] = ""
     ahora = timezone.now()
     hoy = timezone.localdate()
+    inicio_mes = hoy.replace(day=1)
     context["recordatorios_agencia"] = (
-        Reserva.objects.filter(estado__in=["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"], salida__fecha__gte=timezone.localdate())
+        Reserva.objects.filter(
+            fecha_reserva__date__gte=inicio_mes,
+        )
+        .filter(Q(tipo_reserva="agencia") | Q(estado__in=ESTADOS_AGENCIA_VISIBLES))
+        .exclude(estado__in=["pagada_total_agencia", "pagada", "cancelada", "rechazada_agencia"])
         .select_related("salida__tour", "usuario")
-        .order_by("limite_pago_agencia", "salida__fecha", "hora_turno_agencia")[:12]
+        .order_by("agencia_nombre", "fecha_reserva")[:12]
     )
     for item in context["recordatorios_agencia"]:
         if item.limite_pago_agencia:
@@ -857,17 +868,6 @@ def panel_admin(request):
         creado_en__date=actividad_fecha,
     )
     alertas_operativas = []
-    vence_hoy = Reserva.objects.filter(
-        estado__in=["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"],
-        limite_pago_agencia__date=actividad_fecha,
-    ).count()
-    if vence_hoy:
-        alertas_operativas.append({
-            "titulo": "Bloqueos que vencen hoy",
-            "detalle": f"{vence_hoy} reserva(s) de agencia requieren confirmacion hoy.",
-            "enlace": reverse("admin_reservas"),
-            "nivel": "alto",
-        })
     if solicitudes_agencia_pendientes:
         alertas_operativas.append({
             "titulo": "Solicitudes de agencia pendientes",
@@ -1635,6 +1635,7 @@ def admin_reservas(request):
     fecha_filtro = request.GET.get('fecha')
     tipo_actual = (request.GET.get("tipo") or "general").strip().lower()
     estado_agencia = (request.GET.get("estado_agencia") or "activos").strip().lower()
+    hoy = timezone.localdate()
     if tipo_actual not in ["general", "agencia"]:
         tipo_actual = "general"
     if estado_agencia not in ["activos", "solicitud_agencia", "bloqueada_por_agencia", "pagada_total_agencia"]:
@@ -1667,7 +1668,6 @@ def admin_reservas(request):
     reservas = reservas_generales_qs if tipo_actual == "general" else reservas_agencia_qs
     reservas = reservas.order_by("-id")
 
-    hoy = timezone.localdate()
     inicio_mes = hoy.replace(day=1)
     inicio_anio = hoy.replace(month=1, day=1)
     ingresos_total = _resumen_ingresos_reservas().get("total") or Decimal("0.00")
@@ -1702,6 +1702,9 @@ def admin_reservas(request):
             reserva.proveedor_pago = pago_exitoso.get_proveedor_display()
         else:
             reserva.proveedor_pago = None
+
+        fecha_local = timezone.localtime(reserva.fecha_reserva).date()
+        reserva.dias_sin_pago = max((hoy - fecha_local).days, 0)
 
         if reserva.estado == "solicitud_agencia":
             reserva.estado_mostrar = "pendiente"
@@ -1755,6 +1758,226 @@ def admin_reservas(request):
             },
         },
     )
+
+
+@login_required
+@user_passes_test(es_admin_o_secretaria)
+def admin_agencias_sin_pago(request):
+    hoy = timezone.localdate()
+    limite_7d = hoy - timedelta(days=7)
+    reservas_query = (
+        Reserva.objects.select_related("salida__tour", "usuario")
+        .prefetch_related("pagos")
+        .exclude(estado="pendiente")
+    )
+
+    base_agencia = (
+        reservas_query.filter(
+            Q(tipo_reserva="agencia")
+            | Q(estado__in=ESTADOS_AGENCIA_VISIBLES)
+            | Q(codigo_agencia__isnull=False)
+        )
+        .exclude(estado__in=["cancelada", "rechazada_agencia"])
+        .exclude(pagos__estado="paid")
+    )
+
+    reservas_agencia = (
+        base_agencia.filter(fecha_reserva__date__gt=limite_7d)
+        .distinct()
+        .order_by("-fecha_reserva")
+    )
+
+    pendientes_envio_qs = (
+        base_agencia.filter(fecha_reserva__date__gt=limite_7d)
+        .filter(alerta_7d_agencia_enviada_en__isnull=True)
+        .order_by("agencia_correo", "fecha_reserva")
+        .distinct()
+    )
+
+    if request.method == "POST" and request.POST.get("accion") == "enviar_uno":
+        reserva_id = request.POST.get("reserva_id")
+        if not reserva_id:
+            messages.error(request, "Reserva invalida.")
+            return redirect("admin_agencias_sin_pago")
+
+        reserva = (
+            base_agencia.filter(id=reserva_id)
+            .filter(fecha_reserva__date__gt=limite_7d)
+            .first()
+        )
+        if not reserva:
+            messages.error(request, "Reserva no disponible para envio.")
+            return redirect("admin_agencias_sin_pago")
+
+        email = (reserva.agencia_correo or "").strip().lower()
+        if not email and reserva.usuario and reserva.usuario.email:
+            email = (reserva.usuario.email or "").strip().lower()
+        if not email:
+            messages.error(request, "La reserva no tiene correo de agencia.")
+            return redirect("admin_agencias_sin_pago")
+
+        try:
+            fecha_label = timezone.localtime(reserva.fecha_reserva).strftime("%d/%m/%Y")
+            tour_nombre = reserva.salida.tour.nombre if reserva.salida and reserva.salida.tour else "Tour"
+            subject = f"Pago pendiente: reserva sin pago ({hoy.strftime('%d/%m/%Y')})"
+            body = (
+                "Hola,\n\n"
+                "Esta reserva de agencia aun no registra pago:\n"
+                f"- Reserva #{reserva.id:06d} | {tour_nombre} | {fecha_label} | Total: ${reserva.total_pagar}\n\n"
+                f"Deuda total: ${reserva.total_pagar}\n\n"
+                "Por favor coordina el pago con la secretaria o contáctanos si necesitas ayuda.\n\n"
+                "TortugaTur"
+            )
+            correo = EmailMessage(
+                subject=subject,
+                body=body,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[email],
+            )
+            correo.send(fail_silently=False)
+
+            reserva.alerta_7d_agencia_enviada_en = timezone.now()
+            reserva.save(update_fields=["alerta_7d_agencia_enviada_en"])
+            messages.success(request, f"Correo enviado a {email}.")
+        except Exception as e:
+            messages.error(request, f"No se pudo enviar el correo: {e}")
+        return redirect("admin_agencias_sin_pago")
+
+    if request.method == "POST" and request.POST.get("accion") == "enviar_recordatorios":
+        pendientes_envio = list(pendientes_envio_qs)
+
+        agrupadas = {}
+        for reserva in pendientes_envio:
+            email = (reserva.agencia_correo or "").strip().lower()
+            if not email and reserva.usuario and reserva.usuario.email:
+                email = (reserva.usuario.email or "").strip().lower()
+            if not email:
+                continue
+            agrupadas.setdefault(email, []).append(reserva)
+
+        enviados = 0
+        for email, reservas in agrupadas.items():
+            try:
+                total_pendiente = sum([r.total_pagar for r in reservas]) if reservas else 0
+                subject = f"Pago pendiente: reservas sin pago ({hoy.strftime('%d/%m/%Y')})"
+
+                detalle = []
+                for r in reservas:
+                    fecha_label = timezone.localtime(r.fecha_reserva).strftime("%d/%m/%Y")
+                    tour_nombre = r.salida.tour.nombre if r.salida and r.salida.tour else "Tour"
+                    detalle.append(
+                        f"- Reserva #{r.id:06d} | {tour_nombre} | {fecha_label} | Total: ${r.total_pagar}"
+                    )
+                detalle_txt = "\n".join(detalle) if detalle else "- Sin detalle"
+
+                body = (
+                    "Hola,\n\n"
+                    "Estas reservas de agencia aun no registran pago:\n"
+                    f"{detalle_txt}\n\n"
+                    f"Deuda total: ${total_pendiente}\n\n"
+                    "Por favor coordina el pago con la secretaria o contáctanos si necesitas ayuda.\n\n"
+                    "TortugaTur"
+                )
+
+                correo = EmailMessage(
+                    subject=subject,
+                    body=body,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[email],
+                )
+                correo.send(fail_silently=False)
+                enviados += 1
+
+                now = timezone.now()
+                for r in reservas:
+                    r.alerta_7d_agencia_enviada_en = now
+                    r.save(update_fields=["alerta_7d_agencia_enviada_en"])
+            except Exception as e:
+                logger.error("Fallo enviando recordatorio manual a %s: %s", email, e)
+
+        messages.success(request, f"Se enviaron {enviados} recordatorio(s).")
+        return redirect("admin_agencias_sin_pago")
+
+    for reserva in reservas_agencia:
+        fecha_local = timezone.localtime(reserva.fecha_reserva).date()
+        reserva.dias_sin_pago = max((hoy - fecha_local).days, 0)
+        reserva.tiene_pago = any(pago.estado == "paid" for pago in reserva.pagos.all())
+
+        if reserva.estado == "solicitud_agencia":
+            reserva.estado_mostrar = "pendiente"
+        elif reserva.estado == "cotizada_agencia":
+            reserva.estado_mostrar = "cotizada"
+        elif reserva.estado == "confirmada_agencia":
+            reserva.estado_mostrar = "confirmada"
+        elif reserva.estado == "pagada_parcial_agencia":
+            reserva.estado_mostrar = "pagada parcial"
+        elif reserva.estado in ["pagada_total_agencia", "pagada"] or reserva.tiene_pago:
+            reserva.estado_mostrar = "pagada total"
+        elif reserva.estado == "rechazada_agencia":
+            reserva.estado_mostrar = "rechazada"
+        elif reserva.estado == "bloqueada_por_agencia":
+            reserva.estado_mostrar = "bloqueada agencia"
+        else:
+            reserva.estado_mostrar = reserva.estado
+
+    return render(
+        request,
+        "core/panel/agencias_sin_pago.html",
+        {
+            "reservas": reservas_agencia,
+            "pendientes_envio_count": pendientes_envio_qs.count(),
+        },
+    )
+
+
+@login_required
+@user_passes_test(es_admin_o_secretaria)
+def admin_reservas_estado_json(request):
+    tipo_actual = (request.GET.get("tipo") or "general").strip().lower()
+    if tipo_actual != "agencia":
+        return JsonResponse({"items": []})
+
+    reservas_query = (
+        Reserva.objects.select_related("salida__tour")
+        .prefetch_related("pagos")
+        .exclude(estado="pendiente")
+        .exclude(estado__in=["cancelada"])
+    )
+    reservas_agencia = reservas_query.filter(
+        Q(tipo_reserva="agencia")
+        | Q(estado__in=ESTADOS_AGENCIA_VISIBLES)
+        | Q(codigo_agencia__isnull=False)
+    ).distinct()
+
+    items = []
+    for reserva in reservas_agencia:
+        tiene_pago = any(pago.estado == "paid" for pago in reserva.pagos.all())
+
+        if reserva.estado == "solicitud_agencia":
+            estado_mostrar = "pendiente"
+        elif reserva.estado == "cotizada_agencia":
+            estado_mostrar = "cotizada"
+        elif reserva.estado == "confirmada_agencia":
+            estado_mostrar = "confirmada"
+        elif reserva.estado == "pagada_parcial_agencia":
+            estado_mostrar = "pagada parcial"
+        elif reserva.estado in ["pagada_total_agencia", "pagada"] or tiene_pago:
+            estado_mostrar = "pagada total"
+        elif reserva.estado == "rechazada_agencia":
+            estado_mostrar = "rechazada"
+        elif reserva.estado == "bloqueada_por_agencia":
+            estado_mostrar = "bloqueada agencia"
+        else:
+            estado_mostrar = reserva.estado
+
+        items.append({
+            "id": reserva.id,
+            "estado": reserva.estado,
+            "estado_mostrar": estado_mostrar,
+            "tiene_pago": tiene_pago,
+        })
+
+    return JsonResponse({"items": items})
 
 @login_required
 @user_passes_test(es_admin)
@@ -1982,7 +2205,7 @@ def gestionar_solicitud_agencia(request, reserva_id):
 
         reserva.estado = "bloqueada_por_agencia"
         reserva.tipo_reserva = "agencia"
-        reserva.limite_pago_agencia = _calcular_limite_pago_agencia(salida.fecha)
+        reserva.limite_pago_agencia = _calcular_limite_pago_agencia(reserva.fecha_reserva)
         reserva.gestionada_por = request.user
         reserva.save(update_fields=["estado", "tipo_reserva", "limite_pago_agencia", "gestionada_por"])
         salida.cupos_disponibles = 0
@@ -2003,8 +2226,13 @@ def registrar_pago_agencia(request, reserva_id):
     if reserva.estado != "bloqueada_por_agencia":
         messages.error(request, "Solo puedes registrar pago en reservas de agencia bloqueadas.")
         return _redir_admin_reservas(request, "agencia")
+    if not reserva.total_pagar or reserva.total_pagar <= 0:
+        messages.error(request, "Primero registra el monto pendiente antes de confirmar el pago.")
+        return _redir_admin_reservas(request, "agencia")
 
     monto_pagado = _parse_decimal(request.POST.get("monto_pagado"))
+    if monto_pagado is None:
+        monto_pagado = reserva.total_pagar
     if monto_pagado is None or monto_pagado <= 0:
         messages.error(request, "Ingresa un monto pagado valido mayor a 0.")
         return _redir_admin_reservas(request, "agencia")
@@ -2029,6 +2257,35 @@ def registrar_pago_agencia(request, reserva_id):
         return _redir_admin_reservas(request, "agencia")
 
     messages.success(request, f"Pago de agencia registrado en reserva #{reserva.id:06d} por ${monto_pagado}.")
+    return _redir_admin_reservas(request, "agencia")
+
+
+@login_required
+@user_passes_test(es_admin_o_secretaria)
+@require_POST
+def registrar_monto_agencia(request, reserva_id):
+    reserva = get_object_or_404(Reserva.objects.select_related("salida"), id=reserva_id)
+    if not _es_reserva_agencia(reserva):
+        messages.error(request, "La reserva seleccionada no corresponde a una agencia.")
+        return _redir_admin_reservas(request, "agencia")
+    if reserva.estado != "bloqueada_por_agencia":
+        messages.error(request, "Solo puedes registrar monto en reservas de agencia bloqueadas.")
+        return _redir_admin_reservas(request, "agencia")
+
+    monto = _parse_decimal(request.POST.get("monto_pagado"))
+    if monto is None or monto <= 0:
+        messages.error(request, "Ingresa un monto valido mayor a 0.")
+        return _redir_admin_reservas(request, "agencia")
+
+    reserva.total_pagar = monto
+    reserva.monto_pagado_agencia = Decimal("0.00")
+    reserva.tipo_reserva = "agencia"
+    reserva.gestionada_por = request.user
+    if not reserva.limite_pago_agencia:
+        reserva.limite_pago_agencia = _calcular_limite_pago_agencia(reserva.fecha_reserva)
+    reserva.save(update_fields=["total_pagar", "monto_pagado_agencia", "tipo_reserva", "gestionada_por", "limite_pago_agencia"])
+
+    messages.success(request, f"Monto registrado en reserva #{reserva.id:06d} por ${monto}.")
     return _redir_admin_reservas(request, "agencia")
 
 @login_required
@@ -2309,10 +2566,13 @@ def vista_login(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)
-            messages.success(request, f"Que bueno verte de nuevo, {user.first_name}!")
+            if not (user.is_staff or user.is_superuser or es_secretaria(user)):
+                messages.success(request, f"Que bueno verte de nuevo, {user.first_name}!")
             if user.is_staff or user.is_superuser:
+                request.session["welcome_admin"] = True
                 return redirect("panel_admin")
             if es_secretaria(user):
+                request.session["welcome_secretaria"] = True
                 return redirect(_panel_secretaria_url())
             return redirect(request.POST.get('next', 'home'))
     else:
@@ -2417,6 +2677,23 @@ def panel_inicio(request):
             "url": f"{reverse('admin_reservas')}?tipo=agencia",
         })
 
+    limite_7d = hoy - timedelta(days=7)
+    pendientes_envio_count = (
+        Reserva.objects.filter(fecha_reserva__date__gt=limite_7d)
+        .filter(Q(tipo_reserva="agencia") | Q(estado__in=ESTADOS_AGENCIA_VISIBLES))
+        .exclude(estado__in=["pagada_total_agencia", "pagada", "cancelada", "rechazada_agencia"])
+        .distinct()
+        .count()
+    )
+    if pendientes_envio_count:
+        notificaciones.insert(0, {
+            "notif_id": f"agencia-recordatorios-{pendientes_envio_count}",
+            "titulo": "Recordatorios pendientes",
+            "detalle": f"{pendientes_envio_count} reserva(s) sin pago por avisar",
+            "fecha": timezone.now(),
+            "url": f"{reverse('admin_agencias_sin_pago')}",
+        })
+
     inicio_mes = hoy.replace(day=1)
     inicio_anio = hoy.replace(month=1, day=1)
     ingresos_total = Pago.objects.filter(estado="paid").aggregate(total=Sum("monto")).get("total") or Decimal("0.00")
@@ -2434,11 +2711,12 @@ def panel_inicio(request):
 
     recordatorios_agencia = (
         Reserva.objects.filter(
-            estado__in=["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"],
-            salida__fecha__gte=hoy,
+            fecha_reserva__date__gte=inicio_mes,
         )
+        .filter(Q(tipo_reserva="agencia") | Q(estado__in=ESTADOS_AGENCIA_VISIBLES))
+        .exclude(estado__in=["pagada_total_agencia", "pagada", "cancelada", "rechazada_agencia"])
         .select_related("salida__tour")
-        .order_by("limite_pago_agencia", "salida__fecha")[:6]
+        .order_by("agencia_nombre", "fecha_reserva")[:6]
     )
 
     actividad_secretarias = []
@@ -2495,11 +2773,13 @@ def panel_inicio(request):
     context = {
         "admin_nombre": request.user.get_full_name() or request.user.username,
         "rol": "Administrador",
+        "show_welcome": bool(request.session.pop("welcome_admin", False)),
         "kpi_usuarios": User.objects.filter(is_active=True).count(),
         "kpi_tours": Tour.objects.count(),
         "kpi_reservas_hoy": Reserva.objects.filter(fecha_reserva__date=hoy).count(),
         "kpi_ingresos_hoy": Pago.objects.filter(estado="paid", creado_en__date=hoy).aggregate(total=Sum("monto")).get("total") or Decimal("0.00"),
         "kpi_pendientes_agencia": pendientes_agencia,
+        "kpi_bloqueos_agencia": Reserva.objects.filter(estado="bloqueada_por_agencia").count(),
         "kpi_salidas_alerta": salidas_con_pocos_cupos,
         "kpi_penalizaciones_hoy": Pago.objects.filter(
             estado__in=["created", "approved"],
@@ -2589,6 +2869,23 @@ def panel_secretaria(request):
             "url": f"{reverse('admin_reservas')}?tipo=agencia&estado_agencia=solicitud_agencia",
         })
 
+    limite_7d = hoy - timedelta(days=7)
+    pendientes_envio_qs = (
+        Reserva.objects.filter(fecha_reserva__date__gt=limite_7d)
+        .filter(Q(tipo_reserva="agencia") | Q(estado__in=ESTADOS_AGENCIA_VISIBLES))
+        .exclude(estado__in=["pagada_total_agencia", "pagada", "cancelada", "rechazada_agencia"])
+        .distinct()
+    )
+    pendientes_envio_count = pendientes_envio_qs.count()
+    if pendientes_envio_count:
+        notificaciones_bloqueos.insert(0, {
+            "notif_id": f"agencia-recordatorios-{pendientes_envio_count}",
+            "titulo": "Recordatorios pendientes",
+            "detalle": f"{pendientes_envio_count} reserva(s) sin pago por avisar",
+            "fecha": timezone.localtime(timezone.now()),
+            "url": f"{reverse('admin_agencias_sin_pago')}",
+        })
+
     agencias_panel_qs = (
         Reserva.objects.filter(
             Q(tipo_reserva="agencia")
@@ -2618,10 +2915,11 @@ def panel_secretaria(request):
     context = {
         "secretaria_nombre": request.user.get_full_name() or request.user.username,
         "hoy": hoy,
+        "show_welcome": bool(request.session.pop("welcome_secretaria", False)),
         "kpis": {
             "reservas_hoy": reservas_hoy_qs.count(),
             "reservas_mes": reservas_mes_qs.count(),
-            "agencias_hoy": reservas_agencia_hoy_qs.count(),
+            "bloqueos_agencia": Reserva.objects.filter(estado="bloqueada_por_agencia").count(),
             "ingresos_hoy": pagos_hoy,
             "salidas_hoy": salidas_hoy,
             "solicitudes_agencia_pendientes": solicitudes_agencia_pendientes,
@@ -2653,6 +2951,24 @@ def panel_notificaciones_secretaria_json(request):
             "detalle": (r.salida.tour.nombre if r.salida and r.salida.tour else "Solicitud de bloqueo"),
             "fecha": timezone.localtime(r.fecha_reserva).strftime("%d/%m/%Y %I:%M %p"),
             "url": f"{reverse('admin_reservas')}?tipo=agencia&estado_agencia=solicitud_agencia",
+        })
+
+    hoy = timezone.localdate()
+    limite_7d = hoy - timedelta(days=7)
+    pendientes_envio_count = (
+        Reserva.objects.filter(fecha_reserva__date__gt=limite_7d)
+        .filter(Q(tipo_reserva="agencia") | Q(estado__in=ESTADOS_AGENCIA_VISIBLES))
+        .exclude(estado__in=["pagada_total_agencia", "pagada", "cancelada", "rechazada_agencia"])
+        .distinct()
+        .count()
+    )
+    if pendientes_envio_count:
+        notificaciones.insert(0, {
+            "notif_id": f"agencia-recordatorios-{pendientes_envio_count}",
+            "titulo": "Recordatorios pendientes",
+            "detalle": f"{pendientes_envio_count} reserva(s) sin pago por avisar",
+            "fecha": timezone.localtime(timezone.now()).strftime("%d/%m/%Y %I:%M %p"),
+            "url": f"{reverse('admin_agencias_sin_pago')}",
         })
 
     return JsonResponse({
@@ -2696,6 +3012,39 @@ def panel_notificaciones_json(request):
         "notificaciones": notificaciones[:10],
         "generated_at": timezone.localtime(timezone.now()).strftime("%d/%m/%Y %I:%M %p"),
     })
+
+
+@login_required
+def factura_agencia_mensual_pdf(request):
+    if not es_agencia(request.user):
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
+    hoy = timezone.localdate()
+    inicio_mes = hoy.replace(day=1)
+    if hoy.month == 12:
+        fin_mes = date(hoy.year + 1, 1, 1) - timedelta(days=1)
+    else:
+        fin_mes = date(hoy.year, hoy.month + 1, 1) - timedelta(days=1)
+
+    reservas = (
+        Reserva.objects.filter(
+            fecha_reserva__date__range=[inicio_mes, fin_mes],
+        )
+        .filter(Q(tipo_reserva="agencia") | Q(estado__in=ESTADOS_AGENCIA_VISIBLES))
+        .filter(Q(usuario=request.user) | Q(agencia_correo=request.user.email))
+        .exclude(estado__in=["pagada_total_agencia", "pagada", "cancelada", "rechazada_agencia"])
+        .select_related("salida__tour")
+        .order_by("fecha_reserva")
+    )
+
+    empresa = _empresa_config()
+    agencia_nombre = request.user.first_name or request.user.username
+    periodo_label = hoy.strftime("%B %Y")
+    buffer = generar_factura_agencia_mensual_pdf(agencia_nombre, list(reservas), periodo_label, empresa=empresa)
+
+    response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="factura_agencia_{hoy.strftime("%Y%m")}.pdf"'
+    return response
 
 
 @login_required
@@ -3013,50 +3362,48 @@ def _registrar_penalizacion_incumplimiento(reserva):
     )
 
 
-def _enviar_alerta_correo_agencia_24h(reserva):
-    if not reserva.limite_pago_agencia:
+def _enviar_recordatorio_mensual_agencia(agencia_email, reservas, recordatorio_dt):
+    if not agencia_email or not reservas:
         return False
 
-    destinatarios = []
-    if reserva.correo:
-        destinatarios.append(reserva.correo.strip().lower())
-    if reserva.usuario and reserva.usuario.email:
-        destinatarios.append(reserva.usuario.email.strip().lower())
+    total_pendiente = sum([r.total_pagar for r in reservas]) if reservas else Decimal("0.00")
+    recordatorio_label = timezone.localtime(recordatorio_dt).strftime("%d/%m/%Y")
+    periodo_label = timezone.localtime(recordatorio_dt).strftime("%B %Y")
+    agencia_nombre = reservas[0].agencia_nombre if reservas else ""
 
-    destinatarios = [mail for mail in dict.fromkeys(destinatarios) if mail]
-    agencia_email = (getattr(settings, "AGENCIA_EMAIL", "") or "").strip().lower()
-
-    if not destinatarios and not agencia_email:
-        return False
-
-    tour_nombre = getattr(getattr(reserva.salida, "tour", None), "nombre", "Tour")
-    fecha_salida = reserva.salida.fecha.strftime("%d/%m/%Y") if reserva.salida and reserva.salida.fecha else "-"
-    hora_turno = reserva.hora_turno_agencia.strftime("%I:%M %p") if reserva.hora_turno_agencia else "-"
-    vence = timezone.localtime(reserva.limite_pago_agencia).strftime("%d/%m/%Y %I:%M %p")
-
-    subject = f"Recordatorio 24h: Reserva #{reserva.id:05d} por vencer"
+    subject = f"Recordatorio mensual: pagos pendientes de agencia ({recordatorio_label})"
     body = (
-        f"Hola,\n\n"
-        f"Tu reserva de agencia #{reserva.id:05d} está próxima a vencer en menos de 24 horas.\n\n"
-        f"Tour: {tour_nombre}\n"
-        f"Fecha de salida: {fecha_salida}\n"
-        f"Turno agencia: {hora_turno}\n"
-        f"Fecha límite de pago: {vence}\n\n"
-        f"Si no confirmas el pago antes del límite, la reserva se cancelará y se registrará la penalización correspondiente.\n\n"
-        f"TortugaTur"
+        "Hola,\n\n"
+        f"Este es un recordatorio mensual. Al {recordatorio_label} tienes pagos pendientes por reservas realizadas con TortugaTur.\n\n"
+        f"Total pendiente: ${total_pendiente}\n\n"
+        "Adjuntamos la factura mensual con el detalle completo de las reservas del mes.\n"
+        "Por favor coordina el pago en efectivo con la secretaria o contáctanos si necesitas ayuda.\n\n"
+        "TortugaTur"
     )
 
     try:
-        send_mail(
-            subject=subject,
-            message=body,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=destinatarios or [agencia_email],
-            fail_silently=False,
+        empresa = _empresa_config()
+        pdf_buffer = generar_factura_agencia_mensual_pdf(
+            agencia_nombre or "Agencia",
+            reservas,
+            periodo_label,
+            empresa=empresa,
         )
+        email = EmailMessage(
+            subject=subject,
+            body=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[agencia_email],
+        )
+        email.attach(
+            f"factura_agencia_{timezone.localtime(recordatorio_dt).strftime('%Y%m')}.pdf",
+            pdf_buffer.getvalue(),
+            "application/pdf",
+        )
+        email.send(fail_silently=False)
         return True
     except Exception:
-        logger.exception("No se pudo enviar alerta 24h para la reserva %s", reserva.id)
+        logger.exception("No se pudo enviar recordatorio mensual a %s", agencia_email)
         return False
 
 
@@ -3103,69 +3450,57 @@ def _notificar_secretarias_solicitud_agencia(reserva):
 
 
 def _cancelar_reservas_agencia_vencidas():
-    ahora = timezone.now()
-    tz = timezone.get_current_timezone()
+    """
+    Nuevo flujo agencias:
+    - No se cancelan reservas por fecha/hora.
+    - Se envia recordatorio mensual 7 dias antes de terminar el mes.
+    """
+    hoy = timezone.localdate()
+    recordatorio_dt = _calcular_limite_pago_agencia(hoy)
+    recordatorio_date = timezone.localtime(recordatorio_dt).date()
+    if hoy != recordatorio_date:
+        return 0
 
-    # Normaliza reservas existentes: el limite nunca puede pasar de 1 dia antes de la salida.
-    reservas_bloqueadas = (
-        Reserva.objects.filter(estado__in=["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"])
-        .select_related("salida")
-    )
-    for reserva in reservas_bloqueadas:
-        fecha_tope = reserva.salida.fecha - timedelta(days=1)
-        limite_por_salida = timezone.make_aware(
-            datetime.combine(fecha_tope, time(23, 59, 59)),
-            tz,
-        )
-        if reserva.limite_pago_agencia:
-            nuevo_limite = min(reserva.limite_pago_agencia, limite_por_salida)
-        else:
-            nuevo_limite = min(ahora + timedelta(days=15), limite_por_salida)
+    inicio_mes = hoy.replace(day=1)
+    if hoy.month == 12:
+        fin_mes = date(hoy.year + 1, 1, 1) - timedelta(days=1)
+    else:
+        fin_mes = date(hoy.year, hoy.month + 1, 1) - timedelta(days=1)
 
-        if reserva.limite_pago_agencia != nuevo_limite:
-            reserva.limite_pago_agencia = nuevo_limite
-            reserva.save(update_fields=["limite_pago_agencia"])
-
-    # Alerta automatica por correo cuando faltan menos de 24h.
-    por_vencer_24h = (
+    reservas_pendientes = (
         Reserva.objects.filter(
-            estado__in=["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"],
-            limite_pago_agencia__isnull=False,
-            limite_pago_agencia__gt=ahora,
-            limite_pago_agencia__lte=ahora + timedelta(hours=24),
-            alerta_24h_agencia_enviada_en__isnull=True,
+            fecha_reserva__date__range=[inicio_mes, fin_mes],
         )
+        .filter(Q(tipo_reserva="agencia") | Q(estado__in=ESTADOS_AGENCIA_VISIBLES))
+        .exclude(estado__in=["pagada_total_agencia", "pagada", "cancelada", "rechazada_agencia"])
         .select_related("salida__tour", "usuario")
+        .order_by("agencia_correo", "fecha_reserva")
     )
-    for reserva in por_vencer_24h:
-        if _enviar_alerta_correo_agencia_24h(reserva):
-            reserva.alerta_24h_agencia_enviada_en = timezone.now()
-            reserva.save(update_fields=["alerta_24h_agencia_enviada_en"])
 
-    vencidas = (
-        Reserva.objects.filter(
-            estado__in=["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"],
-            limite_pago_agencia__isnull=False,
-            limite_pago_agencia__lt=ahora,
-        )
-        .select_related("salida")
-    )
-    salidas_afectadas = set()
-    ids_vencidas = []
-    for reserva in vencidas:
-        reserva.estado = "cancelada"
-        reserva.save(update_fields=["estado"])
-        _registrar_penalizacion_incumplimiento(reserva)
-        salidas_afectadas.add(reserva.salida_id)
-        ids_vencidas.append(reserva.id)
+    enviados = 0
+    agrupadas = defaultdict(list)
+    for reserva in reservas_pendientes:
+        email = (reserva.agencia_correo or "").strip().lower()
+        if not email and reserva.usuario and reserva.usuario.email:
+            email = (reserva.usuario.email or "").strip().lower()
+        if email:
+            agrupadas[email].append(reserva)
 
-    if salidas_afectadas:
-        for salida in SalidaTour.objects.filter(id__in=salidas_afectadas):
-            _recalcular_disponibilidad_salida(salida)
+    for email, reservas in agrupadas.items():
+        reservas_sin_recordatorio = [
+            r for r in reservas
+            if not r.alerta_24h_agencia_enviada_en
+            or r.alerta_24h_agencia_enviada_en.date() != hoy
+        ]
+        if not reservas_sin_recordatorio:
+            continue
+        if _enviar_recordatorio_mensual_agencia(email, reservas, recordatorio_dt):
+            enviados += 1
+            for r in reservas_sin_recordatorio:
+                r.alerta_24h_agencia_enviada_en = timezone.now()
+                r.save(update_fields=["alerta_24h_agencia_enviada_en"])
 
-    _limpiar_historial_canceladas_agencia_diario()
-
-    return len(ids_vencidas)
+    return enviados
 
 
 def _limpiar_historial_canceladas_agencia_diario():
@@ -3267,15 +3602,6 @@ def _mark_reserva_paid(reserva_id, proveedor, external_id="", payload=None):
     with transaction.atomic():
         reserva = Reserva.objects.select_for_update().select_related("salida").get(id=reserva_id)
         salida = SalidaTour.objects.select_for_update().get(id=reserva.salida_id)
-        if (
-            reserva.estado in ["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"]
-            and reserva.limite_pago_agencia
-            and reserva.limite_pago_agencia < timezone.now()
-        ):
-            reserva.estado = "cancelada"
-            reserva.save(update_fields=["estado"])
-            _recalcular_disponibilidad_salida(salida)
-            raise ValueError("La reserva fue cancelada por incumplimiento del plazo de pago.")
         customer_email = _extract_customer_email(proveedor, payload or {})
         pago = None
         if external_id:
@@ -3346,21 +3672,6 @@ def _mark_reserva_paid(reserva_id, proveedor, external_id="", payload=None):
             )
 
     _send_ticket_email(reserva)
-    
-    # Enviar correo adicional confirmando que el valor bloqueado fue cancelado si era agencia
-    if estado_anterior in ["bloqueada_por_agencia", "cotizada_agencia", "confirmada_agencia", "pagada_parcial_agencia"] and reserva.usuario and reserva.usuario.email:
-        from django.core.mail import send_mail
-        from django.template.loader import render_to_string
-        subject = f"Confirmación de Pago a Agencia - Reserva #{reserva.id:06d}"
-        msg_plain = f"Gracias por su pago. La reserva del código {reserva.codigo_agencia} ha sido procesada."
-        send_mail(
-            subject=subject,
-            message=msg_plain,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[reserva.usuario.email],
-            fail_silently=True
-        )
-
     return reserva, True
 
 

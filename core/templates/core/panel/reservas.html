@@ -178,7 +178,7 @@
                                     <span>Cod: <b>{{ r.codigo_agencia }}</b></span><br>
                                     {% endif %}
                                     {% if r.limite_pago_agencia %}
-                                    <span>Límite: <b>{{ r.limite_pago_agencia|date:"d M Y" }}</b></span><br>
+                                    <span>Recordatorio: <b>{{ r.limite_pago_agencia|date:"d M Y" }}</b></span><br>
                                     {% endif %}
                                     {% if r.hora_turno_agencia %}
                                     <span>Turno agencia: <b>{{ r.hora_turno_agencia|time:"h:i A" }}</b></span><br>
@@ -202,7 +202,7 @@
                             <td class="px-8 py-6 italic tour-nombre">{{ r.salida.tour.nombre }}</td>
                             <td class="px-8 py-6 font-bold monto-total">${{ r.total_pagar }}</td>
                             <td class="px-8 py-6 text-center">
-                                <span
+                                <span id="estado-{{ r.id }}"
                                     class="estado-label px-3 py-1 rounded-lg text-xs font-bold {% if r.estado == 'cancelada' %}bg-red-100 text-red-700{% elif r.estado == 'pagada' or r.tiene_pago %}bg-green-100 text-green-700{% elif r.estado == 'bloqueada_por_agencia' %}bg-blue-100 text-blue-700{% else %}bg-yellow-100 text-yellow-700{% endif %}">
                                     {% if r.estado == "pagada" or r.tiene_pago %}pagada{% elif r.estado == "bloqueada_por_agencia" %}bloqueada agencia{% else %}{{ r.estado }}{% endif %}
                                 </span>
@@ -233,18 +233,32 @@
                                         </form>
                                     </div>
                                     {% elif r.estado == "bloqueada_por_agencia" %}
+                                    {% if r.total_pagar and r.total_pagar > 0 %}
                                     <form method="post" action="{% url 'registrar_pago_agencia' r.id %}" class="flex items-center gap-2 justify-center min-w-[230px]">
                                         {% csrf_token %}
                                         <input type="hidden" name="tipo" value="agencia">
                                         <input type="hidden" name="estado_agencia" value="{{ estado_agencia|default:'activos' }}">
                                         {% if request.GET.fecha %}<input type="hidden" name="fecha" value="{{ request.GET.fecha }}">{% endif %}
-                                        <input type="number" step="0.01" min="0.01" name="monto_pagado" value="{{ r.total_pagar|floatformat:2 }}"
+                                        <span class="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-lg">$ {{ r.total_pagar|floatformat:2 }}</span>
+                                        <button type="submit"
+                                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+                                            Pago recibido
+                                        </button>
+                                    </form>
+                                    {% else %}
+                                    <form method="post" action="{% url 'registrar_monto_agencia' r.id %}" class="flex items-center gap-2 justify-center min-w-[230px]">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="tipo" value="agencia">
+                                        <input type="hidden" name="estado_agencia" value="{{ estado_agencia|default:'activos' }}">
+                                        {% if request.GET.fecha %}<input type="hidden" name="fecha" value="{{ request.GET.fecha }}">{% endif %}
+                                        <input type="number" step="0.01" min="0.01" name="monto_pagado" value=""
                                             class="w-28 border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold" placeholder="Monto">
                                         <button type="submit"
                                             class="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
-                                            Registrar pago
+                                            Registrar monto
                                         </button>
                                     </form>
+                                    {% endif %}
                                     {% elif r.estado == "pagada_total_agencia" or r.estado == "pagada" or r.tiene_pago %}
                                     <a href="{% url 'ver_ticket_pdf' r.id %}" target="_blank"
                                         class="inline-flex items-center bg-indigo-600 text-white px-3 py-1 rounded-lg text-xs font-bold">Ver PDF</a>
@@ -310,5 +324,41 @@
     }
 
 </script>
+
+{% if tipo_actual == "agencia" %}
+<script>
+    function actualizarEstadosAgencia() {
+        fetch("{% url 'admin_reservas_estado_json' %}?tipo=agencia", {
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+        .then(res => res.json())
+        .then(data => {
+            (data.items || []).forEach(item => {
+                const el = document.getElementById(`estado-${item.id}`);
+                if (!el) return;
+
+                let clase = "bg-yellow-100 text-yellow-700";
+                let texto = item.estado_mostrar;
+                if (item.estado === "cancelada") {
+                    clase = "bg-red-100 text-red-700";
+                } else if (item.estado === "pagada" || item.tiene_pago) {
+                    clase = "bg-green-100 text-green-700";
+                    texto = "pagada";
+                } else if (item.estado === "bloqueada_por_agencia") {
+                    clase = "bg-blue-100 text-blue-700";
+                    texto = "bloqueada agencia";
+                }
+
+                el.className = `estado-label px-3 py-1 rounded-lg text-xs font-bold ${clase}`;
+                el.textContent = texto;
+            });
+        })
+        .catch(() => {});
+    }
+
+    setInterval(actualizarEstadosAgencia, 15000);
+    actualizarEstadosAgencia();
+</script>
+{% endif %}
 
 {% endblock %}

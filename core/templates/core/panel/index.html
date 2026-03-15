@@ -115,6 +115,7 @@
           <nav class="space-y-1">
             <a href="{% url 'panel_admin' %}" class="menu-link active"><span class="material-icons text-[18px]">space_dashboard</span><span class="menu-label">Dashboard</span></a>
             <a href="{% url 'admin_reservas' %}?tipo=general" class="menu-link"><span class="material-icons text-[18px]">event_available</span><span class="menu-label">Reservas</span></a>
+            <a href="{% url 'admin_agencias_sin_pago' %}" class="menu-link"><span class="material-icons text-[18px]">schedule</span><span class="menu-label">Agencias sin pago</span></a>
             <a href="{% url 'admin_salidas' %}" class="menu-link"><span class="material-icons text-[18px]">calendar_month</span><span class="menu-label">Salidas</span></a>
             <a href="{% url 'admin_tours' %}" class="menu-link"><span class="material-icons text-[18px]">map</span><span class="menu-label">Tours</span></a>
             <a href="{% url 'destinos' %}" class="menu-link"><span class="material-icons text-[18px]">place</span><span class="menu-label">Destinos</span></a>
@@ -215,6 +216,15 @@
       </header>
 
       <div class="px-4 lg:px-8 py-6 space-y-6">
+        {% if show_welcome %}
+        <div id="admin-welcome" class="fixed right-6 top-6 z-40">
+          <div class="bg-emerald-600 text-white shadow-xl rounded-2xl px-5 py-4 w-[300px]">
+            <p class="text-[11px] uppercase tracking-[.14em] font-black text-emerald-100">Bienvenida</p>
+            <p class="text-base font-extrabold mt-1">Hola, {{ admin_nombre }}.</p>
+            <p class="text-sm text-emerald-100 mt-1">Listo para revisar el panel de hoy.</p>
+          </div>
+        </div>
+        {% endif %}
         <section>
           <h2 class="text-2xl font-extrabold mb-4">Metricas del dia</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-4">
@@ -238,11 +248,11 @@
 
             <article class="card p-5 border-b-4 border-amber-400">
               <div class="flex items-center justify-between">
-                <p class="text-[11px] uppercase tracking-[.14em] font-extrabold" style="color: var(--muted);">Bloqueos</p>
+                <p class="text-[11px] uppercase tracking-[.14em] font-extrabold" style="color: var(--muted);">Bloqueos agencias</p>
                 <span class="chip bg-amber-100 text-amber-700">activo</span>
               </div>
-              <p class="text-4xl font-extrabold mt-3">{{ kpi_pendientes_agencia }}</p>
-              <p class="text-sm mt-2" style="color: var(--muted);">solicitudes de agencia</p>
+              <p class="text-4xl font-extrabold mt-3">{{ kpi_bloqueos_agencia }}</p>
+              <p class="text-sm mt-2" style="color: var(--muted);">solicitudes pendientes: {{ kpi_pendientes_agencia }}</p>
             </article>
 
           </div>
@@ -271,7 +281,7 @@
               </div>
               <div>
                 <div class="flex items-center justify-between text-sm font-bold">
-                  <span style="color: var(--muted);">Anio</span>
+                  <span style="color: var(--muted);">Año</span>
                   <span>{{ resumen_financiero.reservas_anio }} reservas / {{ resumen_financiero.pasajeros_anio }} pasajeros</span>
                 </div>
                 <div class="stat-line mt-2"><span style="width:100%"></span></div>
@@ -453,6 +463,16 @@
       btnSidebarToggle && btnSidebarToggle.addEventListener('click', toggleSidebar);
       btnClose && btnClose.addEventListener('click', closeSidebar);
       overlay && overlay.addEventListener('click', closeSidebar);
+
+      const welcome = document.getElementById('admin-welcome');
+      if (welcome) {
+        setTimeout(() => {
+          welcome.style.opacity = '0';
+          welcome.style.transform = 'translateY(-8px)';
+          welcome.style.transition = 'all 0.3s ease';
+          setTimeout(() => welcome.remove(), 300);
+        }, 3000);
+      }
 
       const applyDarkMode = () => {
         const enabled = localStorage.getItem(darkModeKey) === '1';

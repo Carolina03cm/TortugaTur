@@ -120,6 +120,7 @@ class Reserva(models.Model):
     codigo_agencia = models.CharField(max_length=50, null=True, blank=True)
     limite_pago_agencia = models.DateTimeField(null=True, blank=True)
     alerta_24h_agencia_enviada_en = models.DateTimeField(null=True, blank=True)
+    alerta_7d_agencia_enviada_en = models.DateTimeField(null=True, blank=True)
     hora_turno_agencia = models.TimeField(null=True, blank=True)
     hora_turno_libre = models.TimeField(null=True, blank=True)
     agencia_nombre = models.CharField(max_length=150, blank=True, default="")
