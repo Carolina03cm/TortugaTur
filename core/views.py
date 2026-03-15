@@ -4067,21 +4067,53 @@ def galeria_view(request):
 def panel_galeria(request):
     from .models import Galeria
     from .forms import GaleriaForm
-    fotos_list = Galeria.objects.all().order_by('-id')
+    fotos_list = Galeria.objects.select_related("tour").all().order_by("tour__nombre", "-id")
     
     if request.method == 'POST':
-        form = GaleriaForm(request.POST, request.FILES)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "¡Imagen agregada a la galería con éxito!")
-            return redirect('panel_galeria')
+        tour_id = (request.POST.get("tour") or "").strip()
+        tour = Tour.objects.filter(id=tour_id).first() if tour_id else None
+        imagen_url = (request.POST.get("imagen_url") or "").strip()
+        imagenes = request.FILES.getlist("imagenes")
+
+        if not tour:
+            messages.error(request, "Selecciona un tour válido.")
         else:
-            messages.error(request, "Error al subir la imagen. Verifica los datos.")
+            created = 0
+            for archivo in imagenes:
+                Galeria.objects.create(tour=tour, imagen=archivo)
+                created += 1
+            if imagen_url:
+                Galeria.objects.create(tour=tour, imagen_url=imagen_url)
+                created += 1
+
+            if created == 0:
+                messages.error(request, "Debes subir al menos una imagen o pegar un link.")
+            else:
+                messages.success(request, f"¡{created} imagen(es) agregada(s) a la galería con éxito!")
+                return redirect('panel_galeria')
+
+        form = GaleriaForm(initial={"tour": tour} if tour else None)
     else:
         form = GaleriaForm()
             
+    fotos_por_tour = []
+    current_label = None
+    current_items = []
+    for foto in fotos_list:
+        label = foto.tour.nombre if foto.tour else "General"
+        if current_label is None:
+            current_label = label
+        if label != current_label:
+            fotos_por_tour.append({"label": current_label, "items": current_items})
+            current_label = label
+            current_items = []
+        current_items.append(foto)
+    if current_label is not None:
+        fotos_por_tour.append({"label": current_label, "items": current_items})
+
     return render(request, 'core/panel/galeria.html', {
         'fotos': fotos_list,
+        'fotos_por_tour': fotos_por_tour,
         'form': form
     })
 
@@ -4093,6 +4125,22 @@ def eliminar_galeria(request, pk):
     foto = get_object_or_404(Galeria, pk=pk)
     foto.delete()
     messages.success(request, "Imagen eliminada correctamente.")
+    return redirect('panel_galeria')
+
+
+@login_required
+@user_passes_test(es_admin)
+@require_POST
+def eliminar_galeria_multiple(request):
+    from .models import Galeria
+    ids = request.POST.getlist("foto_ids")
+    if not ids:
+        messages.error(request, "No seleccionaste ninguna imagen.")
+        return redirect('panel_galeria')
+    qs = Galeria.objects.filter(id__in=ids)
+    total = qs.count()
+    qs.delete()
+    messages.success(request, f"{total} imagen(es) eliminada(s).")
     return redirect('panel_galeria')
 
 @login_required

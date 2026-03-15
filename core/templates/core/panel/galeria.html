@@ -39,56 +39,64 @@
             </div>
         </div>
 
-        <div class="lg:col-span-2">
-            <div
-                class="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden">
-                <table class="w-full text-left border-collapse">
-                    <thead class="bg-slate-900 text-white text-[10px] uppercase tracking-[0.2em]">
-                        <tr>
-                            <th class="px-8 py-6">Foto</th>
-                            <th class="px-8 py-6">Tour</th>
-                            <th class="px-8 py-6 text-center">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-50">
-                        {% for foto in fotos %}
-                        <tr class="group hover:bg-slate-50/80 transition-all duration-300">
-                            <td class="px-8 py-5">
-                                <img src="{{ foto.obtener_imagen_url }}"
-                                    class="w-16 h-16 object-cover rounded-xl shadow-sm" alt="Foto">
-                            </td>
-                            <td class="px-8 py-5">
-                                <div class="font-bold text-slate-700">{{ foto.tour.nombre|default:"General" }}</div>
-                            </td>
-                            <td class="px-8 py-5">
-                                <div class="flex items-center justify-center gap-3">
-                                    <form action="{% url 'eliminar_galeria' foto.id %}" method="post"
-                                        onsubmit="return confirmDelete()" class="inline">
-                                        {% csrf_token %}
-                                        <button type="submit"
-                                            class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all"
-                                            title="Eliminar">
-                                            <span class="material-icons text-lg">delete_outline</span>
-                                        </button>
-                                    </form>
+        <div class="lg:col-span-2 space-y-8">
+            {% if fotos_por_tour %}
+                {% for bloque in fotos_por_tour %}
+                <div class="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden">
+                    <div class="px-8 py-6 bg-slate-900 text-white flex items-center justify-between">
+                        <h3 class="text-sm font-black uppercase tracking-[0.2em]">{{ bloque.label }}</h3>
+                        <div class="flex items-center gap-3">
+                            <span class="text-[10px] bg-white/10 px-3 py-1 rounded-full tracking-[0.2em]">
+                                {{ bloque.items|length }} fotos
+                            </span>
+                            <button type="button" class="select-all-btn text-[10px] bg-white/20 px-3 py-1 rounded-full tracking-[0.2em] hover:bg-white/30">
+                                Seleccionar todo
+                            </button>
+                        </div>
+                    </div>
+                    <form method="post" action="{% url 'eliminar_galeria_multiple' %}" class="p-8">
+                        {% csrf_token %}
+                        <div class="flex items-center justify-between mb-4">
+                            <label class="text-xs uppercase tracking-[0.2em] text-slate-400">
+                                Selecciona fotos para eliminar
+                            </label>
+                            <button type="submit" class="delete-selected-btn hidden bg-red-500 text-white text-xs font-black px-4 py-2 rounded-xl hover:bg-red-600 transition">
+                                Eliminar seleccionadas
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
+                            {% for foto in bloque.items %}
+                            <div class="group bg-slate-50 rounded-2xl p-3 border border-slate-100 hover:shadow-lg transition-all relative">
+                                <label class="absolute top-3 left-3 z-10 bg-white/90 rounded-full p-1 shadow">
+                                    <input type="checkbox" name="foto_ids" value="{{ foto.id }}" class="foto-checkbox w-4 h-4 accent-red-500">
+                                </label>
+                                <img src="{{ foto.obtener_imagen_url }}" class="w-full h-36 object-cover rounded-xl" alt="Foto">
+                                <div class="mt-3 flex items-center justify-between">
+                                    <span class="text-xs text-slate-400">ID {{ foto.id }}</span>
+                                    <button type="submit"
+                                        formaction="{% url 'eliminar_galeria' foto.id %}"
+                                        formmethod="post"
+                                        onclick="return confirmDelete()"
+                                        class="w-9 h-9 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all"
+                                        title="Eliminar">
+                                        <span class="material-icons text-lg">delete_outline</span>
+                                    </button>
                                 </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="3" class="px-8 py-24 text-center">
-                                <div class="flex flex-col items-center">
-                                    <span class="material-icons text-6xl text-slate-100 mb-4">photo_library</span>
-                                    <p class="text-slate-400 font-bold">No hay fotos registradas aún.</p>
-                                    <p class="text-slate-300 text-sm">Comienza agregando una en el panel de la
-                                        izquierda.</p>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </form>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div class="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 p-12 text-center">
+                <div class="flex flex-col items-center">
+                    <span class="material-icons text-6xl text-slate-100 mb-4">photo_library</span>
+                    <p class="text-slate-400 font-bold">No hay fotos registradas aún.</p>
+                    <p class="text-slate-300 text-sm">Comienza agregando una en el panel de la izquierda.</p>
+                </div>
             </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -96,6 +104,30 @@
 <script>
     function confirmDelete() {
         return confirm(`¿Estás seguro de que deseas eliminar esta imagen? Esta acción no se puede deshacer.`);
+    }
+
+    document.querySelectorAll('.select-all-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const block = btn.closest('.bg-white');
+            const checkboxes = block.querySelectorAll('input.foto-checkbox');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+            toggleDeleteButton(block);
+        });
+    });
+
+    document.querySelectorAll('input.foto-checkbox').forEach((cb) => {
+        cb.addEventListener('change', () => {
+            const block = cb.closest('.bg-white');
+            toggleDeleteButton(block);
+        });
+    });
+
+    function toggleDeleteButton(block) {
+        if (!block) return;
+        const anyChecked = block.querySelectorAll('input.foto-checkbox:checked').length > 0;
+        const btn = block.querySelector('.delete-selected-btn');
+        if (btn) btn.classList.toggle('hidden', !anyChecked);
     }
 </script>
 

@@ -37,6 +37,7 @@ urlpatterns = [
     path("panel/tours/editar/<int:pk>/", views.editar_tour, name="editar_tour"),
     path("panel/tours/eliminar/<int:pk>/", views.eliminar_tour, name="eliminar_tour"),
     path("panel/galeria/", views.panel_galeria, name="panel_galeria"),
+    path("panel/galeria/eliminar-multiple/", views.eliminar_galeria_multiple, name="eliminar_galeria_multiple"),
     path("panel/galeria/eliminar/<int:pk>/", views.eliminar_galeria, name="eliminar_galeria"),
     path("panel/empresa/", views.empresa_config, name="empresa_config"),
     path("panel/perfil/", views.perfil_admin, name="perfil_admin"),

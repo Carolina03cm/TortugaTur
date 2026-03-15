@@ -206,15 +206,34 @@ class ContactoForm(forms.Form):
     asunto = forms.ChoiceField(choices=OPCIONES_ASUNTO)
     mensaje = forms.CharField(widget=forms.Textarea)
 
+class MultipleFileInput(forms.FileInput):
+    allow_multiple_selected = True
+
+
 class GaleriaForm(forms.ModelForm):
+    imagenes = forms.FileField(
+        required=False,
+        widget=MultipleFileInput(attrs={
+            'class': 'w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-primary',
+            'multiple': True,
+            'accept': 'image/*',
+        }),
+        label="Imágenes (múltiples)",
+    )
+
     class Meta:
         model = Galeria
-        fields = ['tour', 'imagen', 'imagen_url']
+        fields = ['tour', 'imagen_url']
         widgets = {
             'tour': forms.Select(attrs={'class': 'w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-primary'}),
-            'imagen': forms.ClearableFileInput(attrs={'class': 'w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-primary'}),
             'imagen_url': forms.URLInput(attrs={'class': 'w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-primary', 'placeholder': 'https://link...'}),
         }
+
+    field_order = ['tour', 'imagenes', 'imagen_url']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["imagen_url"].required = False
 
 
 class EmpresaConfigForm(forms.ModelForm):

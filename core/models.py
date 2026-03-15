@@ -270,8 +270,8 @@ class Galeria(models.Model):
             
             text = "TortugaTur"
             width, height = img.size
-            # Compact watermark text.
-            fontsize = max(int(width / 62), 8)
+            # Compact watermark text (larger for better visibility).
+            fontsize = max(int(width / 28), 18)
 
             try:
                 import platform
@@ -292,14 +292,14 @@ class Galeria(models.Model):
             except Exception:
                 text_width, text_height = (fontsize * len(text) // 1.5, fontsize)
 
-            margin_right = int(width * 0.018)
-            margin_bottom = int(height * 0.018)
+            margin_right = int(width * 0.012)
+            margin_bottom = int(height * 0.012)
 
             # Optional static logo watermark.
             logo = None
             logo_width = 0
             logo_height = 0
-            logo_gap = max(int(width * 0.004), 4)
+            logo_gap = max(int(width * 0.006), 6)
             possible_logo_paths = [
                 os.path.join(settings.BASE_DIR, "core", "static", "icon", "logo.png"),
                 os.path.join(settings.BASE_DIR, "static", "icon", "logo.png"),
@@ -308,13 +308,15 @@ class Galeria(models.Model):
                 if os.path.exists(logo_path):
                     try:
                         logo = Image.open(logo_path).convert("RGBA")
-                        logo_width = max(min(int(width * 0.035), 42), 20)
-                        ratio = logo_width / float(max(logo.size[0], 1))
-                        logo_height = max(int(logo.size[1] * ratio), 10)
+                        # Scale logo based on text height for consistent proportions.
+                        target_logo_h = max(int(text_height * 1.05), 18)
+                        ratio = target_logo_h / float(max(logo.size[1], 1))
+                        logo_width = max(int(logo.size[0] * ratio), 18)
+                        logo_height = target_logo_h
                         logo = logo.resize((logo_width, logo_height), Image.LANCZOS)
 
-                        # Subtle but readable opacity.
-                        alpha = logo.split()[3].point(lambda p: int(p * 0.36))
+                        # Stronger opacity for visibility.
+                        alpha = logo.split()[3].point(lambda p: int(p * 0.75))
                         logo.putalpha(alpha)
                     except Exception:
                         logo = None
@@ -327,13 +329,38 @@ class Galeria(models.Model):
             logo_x = text_x + text_width + logo_gap
             logo_y = height - content_h - margin_bottom + max((content_h - logo_height) // 2, 0)
 
-            # Minimal contrast bump for readability on bright sand/sky.
-            draw.text((text_x + 1, text_y + 1), text, font=font, fill=(0, 0, 0, 55))
-            color_texto = (245, 248, 250, 145)
+            # Stronger contrast bump for readability on bright sand/sky.
+            for dx, dy, alpha in [
+                (-2, 0, 160),
+                (2, 0, 160),
+                (0, -2, 160),
+                (0, 2, 160),
+                (-1, -1, 140),
+                (1, 1, 140),
+                (-1, 1, 140),
+                (1, -1, 140),
+            ]:
+                draw.text((text_x + dx, text_y + dy), text, font=font, fill=(0, 0, 0, alpha))
+            color_texto = (245, 248, 250, 240)
             draw.text((text_x, text_y), text, font=font, fill=color_texto)
 
             if logo:
-                txt.alpha_composite(logo, dest=(logo_x, logo_y))
+                # Add a subtle badge behind the logo for clarity.
+                pad = max(int(logo_height * 0.22), 6)
+                badge_w = logo_width + (pad * 2)
+                badge_h = logo_height + (pad * 2)
+                badge = Image.new("RGBA", (badge_w, badge_h), (255, 255, 255, 0))
+                badge_draw = ImageDraw.Draw(badge)
+                badge_draw.ellipse(
+                    (0, 0, badge_w - 1, badge_h - 1),
+                    fill=(255, 255, 255, 190),
+                    outline=(0, 0, 0, 140),
+                    width=max(int(badge_w * 0.04), 2),
+                )
+                badge.paste(logo, (pad, pad), logo)
+                logo_x = max(logo_x - pad, 0)
+                logo_y = max(logo_y - pad, 0)
+                txt.alpha_composite(badge, dest=(logo_x, logo_y))
 
             watermarked = Image.alpha_composite(img, txt)
             
