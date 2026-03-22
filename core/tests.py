@@ -4,7 +4,7 @@ from django.contrib.auth.models import Group, User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Destino, Reserva, SalidaTour, Tour
+from .models import Destino, Reserva, SalidaTour, SiteVisit, Tour
 
 
 class CheckoutSecurityTests(TestCase):
@@ -171,3 +171,55 @@ class AgenciaHorarioAgenciaTests(TestCase):
         self.assertContains(response, 'name="fecha_agencia"', html=False)
         self.assertContains(response, 'name="hora_turno_agencia"', html=False)
         self.assertNotContains(response, "Sin disponibilidad")
+
+
+class SiteVisitByIpTests(TestCase):
+    def setUp(self):
+        destino = Destino.objects.create(
+            nombre="Santa Cruz",
+            imagen_url="https://example.com/destino.jpg",
+        )
+        self.tour = Tour.objects.create(
+            nombre="Tour Visitas",
+            destino=destino,
+            descripcion="Tour con contador",
+            precio=Decimal("90.00"),
+            precio_adulto=Decimal("90.00"),
+            precio_nino=Decimal("60.00"),
+            cupo_maximo=16,
+            cupos_disponibles=16,
+            hora_turno_1="08:00",
+            visible_para_agencias=True,
+        )
+
+    def test_misma_ip_cuenta_una_sola_vez(self):
+        url = reverse("home")
+
+        response_1 = self.client.get(url, REMOTE_ADDR="10.0.0.1")
+        response_2 = self.client.get(url, REMOTE_ADDR="10.0.0.1")
+
+        self.assertEqual(response_1.status_code, 200)
+        self.assertEqual(response_2.status_code, 200)
+        self.assertEqual(SiteVisit.objects.count(), 1)
+        self.assertContains(response_2, "Visitas:")
+        self.assertContains(response_2, ">1<", html=False)
+
+    def test_ips_distintas_incrementan_contador(self):
+        url = reverse("home")
+
+        self.client.get(url, REMOTE_ADDR="10.0.0.1")
+        response = self.client.get(url, REMOTE_ADDR="10.0.0.2")
+
+        self.assertEqual(SiteVisit.objects.count(), 2)
+        self.assertContains(response, "Visitas:")
+        self.assertContains(response, ">2<", html=False)
+
+    def test_home_muestra_total_de_ips_unicas(self):
+        SiteVisit.objects.create(ip_address="10.0.0.1")
+        SiteVisit.objects.create(ip_address="10.0.0.2")
+
+        response = self.client.get(reverse("home"), REMOTE_ADDR="10.0.0.1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Visitas:")
+        self.assertContains(response, ">2<", html=False)

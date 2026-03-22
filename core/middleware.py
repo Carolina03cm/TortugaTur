@@ -1,7 +1,7 @@
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.conf import settings
-from .models import UserProfile
+from .models import SiteVisit, UserProfile
 
 
 class ForcePasswordChangeMiddleware:
@@ -33,6 +33,14 @@ class ForcePasswordChangeMiddleware:
                     if force_change:
                         return redirect(perfil_url)
 
+        if request.method == "GET":
+            static_url = getattr(settings, "STATIC_URL", "/static/")
+            media_url = getattr(settings, "MEDIA_URL", "/media/")
+            if not request.path.startswith((static_url, media_url, "/admin")):
+                ip_address = self._get_client_ip(request)
+                if ip_address:
+                    SiteVisit.objects.get_or_create(ip_address=ip_address)
+
         response = self.get_response(request)
 
         should_disable_cache = (user and user.is_authenticated) or request.path in {login_url, logout_url}
@@ -43,3 +51,9 @@ class ForcePasswordChangeMiddleware:
             response["Expires"] = "0"
 
         return response
+
+    def _get_client_ip(self, request):
+        forwarded_for = (request.META.get("HTTP_X_FORWARDED_FOR") or "").strip()
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip()
+        return (request.META.get("REMOTE_ADDR") or "").strip()

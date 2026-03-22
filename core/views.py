@@ -29,7 +29,7 @@ from collections import defaultdict
 import re
 import unicodedata
 from urllib.parse import urlencode
-from .models import Destino, Tour, SalidaTour, Reserva, Pago, Resena, Ticket, EmpresaConfig, Galeria, UserProfile
+from .models import Destino, Tour, SiteVisit, SalidaTour, Reserva, Pago, Resena, Ticket, EmpresaConfig, Galeria, UserProfile
 from .utils import generar_ticket_pdf, generar_actividad_dia_pdf, generar_factura_agencia_mensual_pdf
 from .forms import DestinoForm, TourForm, RegistroTuristaForm, ContactoForm, TuristaLoginForm, EmpresaConfigForm
 
@@ -185,6 +185,7 @@ def home(request):
     destinos = Destino.objects.all()
     tours_destacados = _filtrar_tours_para_usuario(Tour.objects.all(), request.user)[:3]
     currency_code, currency_rate = _currency_context(request)
+    visitas_home_total = SiteVisit.objects.count()
     for tour in tours_destacados:
         display = _tour_price_display(tour, currency_rate, request.user)
         tour.precio_adulto_display = display["adulto"]
@@ -197,6 +198,7 @@ def home(request):
     context = {
         "destinos": destinos,
         "tours_destacados": tours_destacados,
+        "visitas_home_total": visitas_home_total,
         "currency_code": currency_code,
         "currency_options": list(getattr(settings, "CURRENCY_RATES", {}).keys()),
     }
@@ -3263,6 +3265,13 @@ def _tour_price_display(tour, currency_rate, user=None):
         "adulto": precio_adulto * currency_rate,
         "nino": precio_nino * currency_rate,
     }
+
+
+def _get_client_ip(request):
+    forwarded_for = (request.META.get("HTTP_X_FORWARDED_FOR") or "").strip()
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return (request.META.get("REMOTE_ADDR") or "").strip()
 
 
 def _resumen_ingresos_reservas(fecha_desde=None):
