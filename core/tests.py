@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.test import Client
 from django.contrib.auth.models import Group, User
 from django.test import TestCase
 from django.urls import reverse
@@ -210,13 +211,26 @@ class SiteVisitByIpTests(TestCase):
         self.client.get(url, REMOTE_ADDR="10.0.0.1")
         response = self.client.get(url, REMOTE_ADDR="10.0.0.2")
 
+        self.assertEqual(SiteVisit.objects.count(), 1)
+        self.assertContains(response, "Visitas:")
+        self.assertContains(response, ">1<", html=False)
+
+    def test_dos_navegadores_distintos_misma_ip_cuentan_dos_visitas(self):
+        url = reverse("home")
+        client_1 = Client()
+        client_2 = Client()
+
+        client_1.get(url, REMOTE_ADDR="10.0.0.1")
+        response = client_2.get(url, REMOTE_ADDR="10.0.0.1")
+
         self.assertEqual(SiteVisit.objects.count(), 2)
         self.assertContains(response, "Visitas:")
         self.assertContains(response, ">2<", html=False)
 
     def test_home_muestra_total_de_ips_unicas(self):
-        SiteVisit.objects.create(ip_address="10.0.0.1")
-        SiteVisit.objects.create(ip_address="10.0.0.2")
+        SiteVisit.objects.create(visitor_key="visitor-1", ip_address="10.0.0.1")
+        SiteVisit.objects.create(visitor_key="visitor-2", ip_address="10.0.0.2")
+        self.client.cookies["tt_visitor_id"] = "visitor-1"
 
         response = self.client.get(reverse("home"), REMOTE_ADDR="10.0.0.1")
 

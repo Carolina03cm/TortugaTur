@@ -57,12 +57,13 @@ class Tour(models.Model):
 
 
 class SiteVisit(models.Model):
-    ip_address = models.GenericIPAddressField(unique=True)
+    visitor_key = models.CharField(max_length=64, unique=True)
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
     first_seen = models.DateTimeField(auto_now_add=True)
     last_seen = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.ip_address
+        return f"{self.visitor_key} - {self.ip_address or 'sin-ip'}"
 
 class SalidaTour(models.Model):
     tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name="salidas")

@@ -1,8 +1,12 @@
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.conf import settings
+from uuid import uuid4
+
 from .models import SiteVisit, UserProfile
 from .ip_utils import normalize_ip
+
+VISITOR_COOKIE_NAME = "tt_visitor_id"
 
 
 class ForcePasswordChangeMiddleware:
@@ -37,12 +41,31 @@ class ForcePasswordChangeMiddleware:
         if request.method == "GET":
             static_url = getattr(settings, "STATIC_URL", "/static/")
             media_url = getattr(settings, "MEDIA_URL", "/media/")
+            new_visitor_key = ""
             if not request.path.startswith((static_url, media_url, "/admin")):
                 ip_address = self._get_client_ip(request)
-                if ip_address:
-                    SiteVisit.objects.get_or_create(ip_address=ip_address)
+                visitor_key = (request.COOKIES.get(VISITOR_COOKIE_NAME) or "").strip()
+                if not visitor_key:
+                    visitor_key = uuid4().hex
+                    new_visitor_key = visitor_key
+                visit, created = SiteVisit.objects.get_or_create(
+                    visitor_key=visitor_key,
+                    defaults={"ip_address": ip_address},
+                )
+                if not created and ip_address and visit.ip_address != ip_address:
+                    visit.ip_address = ip_address
+                    visit.save(update_fields=["ip_address", "last_seen"])
 
         response = self.get_response(request)
+
+        if request.method == "GET" and 'new_visitor_key' in locals() and new_visitor_key:
+            response.set_cookie(
+                VISITOR_COOKIE_NAME,
+                new_visitor_key,
+                max_age=60 * 60 * 24 * 365,
+                httponly=True,
+                samesite="Lax",
+            )
 
         should_disable_cache = (user and user.is_authenticated) or request.path in {login_url, logout_url}
         if should_disable_cache:
