@@ -2,6 +2,7 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.conf import settings
 from .models import SiteVisit, UserProfile
+from .ip_utils import normalize_ip
 
 
 class ForcePasswordChangeMiddleware:
@@ -55,5 +56,8 @@ class ForcePasswordChangeMiddleware:
     def _get_client_ip(self, request):
         forwarded_for = (request.META.get("HTTP_X_FORWARDED_FOR") or "").strip()
         if forwarded_for:
-            return forwarded_for.split(",")[0].strip()
-        return (request.META.get("REMOTE_ADDR") or "").strip()
+            return normalize_ip(forwarded_for.split(",")[0].strip())
+        real_ip = (request.META.get("HTTP_X_REAL_IP") or "").strip()
+        if real_ip:
+            return normalize_ip(real_ip)
+        return normalize_ip(request.META.get("REMOTE_ADDR"))

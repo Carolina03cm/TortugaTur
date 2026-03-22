@@ -223,3 +223,26 @@ class SiteVisitByIpTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Visitas:")
         self.assertContains(response, ">2<", html=False)
+
+    def test_ipv4_mapeada_en_ipv6_cuenta_como_misma_ip_real(self):
+        url = reverse("home")
+
+        self.client.get(url, REMOTE_ADDR="::ffff:10.0.0.1")
+        response = self.client.get(url, REMOTE_ADDR="10.0.0.1")
+
+        self.assertEqual(SiteVisit.objects.count(), 1)
+        self.assertContains(response, "Visitas:")
+        self.assertContains(response, ">1<", html=False)
+
+    def test_x_forwarded_for_normaliza_y_prioriza_ip_real(self):
+        url = reverse("home")
+
+        response = self.client.get(
+            url,
+            REMOTE_ADDR="127.0.0.1",
+            HTTP_X_FORWARDED_FOR="::ffff:10.0.0.8, 127.0.0.1",
+        )
+
+        self.assertEqual(SiteVisit.objects.count(), 1)
+        self.assertEqual(SiteVisit.objects.first().ip_address, "10.0.0.8")
+        self.assertContains(response, ">1<", html=False)
