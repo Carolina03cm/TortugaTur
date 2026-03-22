@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.test import TestCase
 from django.urls import reverse
 
@@ -60,3 +60,114 @@ class CheckoutSecurityTests(TestCase):
         self.client.login(username="other", password="pass12345")
         response = self.client.post(reverse("create_paypal_order", args=[self.reserva.id]))
         self.assertEqual(response.status_code, 403)
+
+
+class AgenciaHorarioAgenciaTests(TestCase):
+    def setUp(self):
+        self.agencia_group = Group.objects.create(name="agencia")
+        self.agencia = User.objects.create_user(
+            username="agencia1",
+            password="pass12345",
+            email="agencia@example.com",
+        )
+        self.agencia.groups.add(self.agencia_group)
+
+        destino = Destino.objects.create(
+            nombre="Isabela",
+            imagen_url="https://example.com/isabela.jpg",
+        )
+        self.tour = Tour.objects.create(
+            nombre="Tour Agencia",
+            destino=destino,
+            descripcion="Tour para agencias",
+            precio=Decimal("120.00"),
+            precio_adulto=Decimal("120.00"),
+            precio_nino=Decimal("70.00"),
+            cupo_maximo=16,
+            cupos_disponibles=16,
+            hora_turno_1="08:00",
+            hora_turno_2="14:00",
+            visible_para_agencias=True,
+        )
+
+    def test_agencia_puede_elegir_turno_definido_por_admin(self):
+        self.client.login(username="agencia1", password="pass12345")
+
+        response = self.client.post(
+            reverse("tour_detalle", args=[self.tour.id]),
+            {
+                "fecha_agencia": "2030-02-10",
+                "hora_turno_agencia": "08:00",
+                "adultos": "2",
+                "ninos": "0",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("mis_reservas"))
+
+        reserva = Reserva.objects.get(usuario=self.agencia, tipo_reserva="agencia")
+        self.assertEqual(str(reserva.salida.fecha), "2030-02-10")
+        self.assertEqual(reserva.hora_turno_agencia.strftime("%H:%M"), "08:00")
+        self.assertEqual(reserva.salida.hora.strftime("%H:%M"), "08:00")
+
+    def test_agencia_puede_reusar_turno_configurado_si_ya_hay_otra_reserva_agencia(self):
+        otra_agencia = User.objects.create_user(
+            username="agencia2",
+            password="pass12345",
+            email="agencia2@example.com",
+        )
+        otra_agencia.groups.add(self.agencia_group)
+        salida = SalidaTour.objects.create(
+            tour=self.tour,
+            fecha="2030-02-10",
+            hora="08:00",
+            cupo_maximo=16,
+            cupos_disponibles=16,
+        )
+        Reserva.objects.create(
+            usuario=otra_agencia,
+            salida=salida,
+            adultos=2,
+            ninos=0,
+            total_pagar=Decimal("0.00"),
+            tipo_reserva="agencia",
+            nombre="Agencia",
+            apellidos="Dos",
+            correo="agencia2@example.com",
+            telefono="0999999999",
+            identificacion="1234567890",
+            estado="solicitud_agencia",
+            hora_turno_agencia=salida.hora,
+        )
+
+        self.client.login(username="agencia1", password="pass12345")
+        response = self.client.post(
+            reverse("tour_detalle", args=[self.tour.id]),
+            {
+                "fecha_agencia": "2030-02-10",
+                "hora_turno_agencia": "08:00",
+                "adultos": "2",
+                "ninos": "0",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            Reserva.objects.filter(
+                salida__tour=self.tour,
+                salida__fecha="2030-02-10",
+                hora_turno_agencia="08:00",
+                tipo_reserva="agencia",
+            ).count(),
+            2,
+        )
+
+    def test_agencia_ve_formulario_aunque_no_existan_salidas(self):
+        self.client.login(username="agencia1", password="pass12345")
+        response = self.client.get(reverse("tour_detalle", args=[self.tour.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="fecha_agencia"', html=False)
+        self.assertContains(response, 'name="hora_turno_agencia"', html=False)
+        self.assertNotContains(response, "Sin disponibilidad")

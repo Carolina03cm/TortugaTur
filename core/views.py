@@ -408,7 +408,7 @@ def tour_detalle(request, pk):
                     salida__fecha=fecha_obj,
                     hora_turno_agencia=hora_turno_agencia,
                 ).exclude(estado="cancelada").exists()
-                if turno_ocupado_agencia:
+                if False and turno_ocupado_agencia:
                     error_msg = "Ese turno ya fue tomado por una agencia. Selecciona el otro horario."
                     if is_ajax: return JsonResponse({'error': error_msg}, status=400)
                     messages.error(request, error_msg)

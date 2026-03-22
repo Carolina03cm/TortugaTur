@@ -139,7 +139,7 @@
         </div>
         
         <div class="lg:col-span-1">
-            {% if salidas %}
+            {% if user_is_agencia or salidas %}
             <div id="reservaContainer"
                 class="sticky top-28 bg-white border border-slate-200 rounded-[3rem] p-8 shadow-2xl transition-all duration-500">
 
@@ -161,6 +161,7 @@
                                     <input type="date" name="fecha_agencia" id="fechaAgencia" min="{% now 'Y-m-d' %}"
                                         class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-primary/10 transition-all font-sans"
                                         required onchange="actualizarHorariosAgencia(); recalcular()">
+                                    {% if agencia_horarios %}
                                     <select name="hora_turno_agencia" id="horaTurnoAgencia"
                                         class="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-slate-700 appearance-none outline-none focus:ring-4 focus:ring-primary/10 transition-all"
                                         required onchange="recalcular()">
@@ -169,6 +170,11 @@
                                         <option value="{{ h|time:'H:i' }}">{{ h|time:"h:i A" }}</option>
                                         {% endfor %}
                                     </select>
+                                    {% else %}
+                                    <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+                                        Este tour no tiene horarios configurados para agencias. Solicita al administrador que defina al menos un turno.
+                                    </div>
+                                    {% endif %}
                                 </div>
                                 {% else %}
                                 <select name="salida" id="selectSalida"
@@ -519,34 +525,9 @@
     const usuarioLogueado = "{{ user.is_authenticated|yesno:'true,false' }}" === "true";
     const usuarioEsAgencia = "{{ user_is_agencia|yesno:'true,false' }}" === "true";
     const descuentoNinosActivo = "{{ aplica_descuento_ninos|yesno:'true,false' }}" === "true";
-    const turnosOcupadosAgencia = JSON.parse('{{ bloqueos_agencia_json|default:"{}"|safe|escapejs }}');
 
     function actualizarHorariosAgencia() {
-        const fechaInput = document.getElementById('fechaAgencia');
-        const selectHorario = document.getElementById('horaTurnoAgencia');
-        if (!fechaInput || !selectHorario) return;
-
-        const fecha = fechaInput.value;
-        const ocupados = new Set(turnosOcupadosAgencia[fecha] || []);
-        let hayOpcionesLibres = false;
-
-        Array.from(selectHorario.options).forEach(opt => {
-            if (!opt.value) return;
-            const bloqueado = ocupados.has(opt.value);
-            opt.disabled = bloqueado;
-            opt.hidden = bloqueado;
-            if (!bloqueado) hayOpcionesLibres = true;
-        });
-
-        const seleccionActual = selectHorario.value;
-        if (seleccionActual && ocupados.has(seleccionActual)) {
-            selectHorario.value = "";
-        }
-
-        if (!hayOpcionesLibres && fecha) {
-            selectHorario.value = "";
-            mostrarError("Ese dia ya no tiene turnos libres para agencias.");
-        }
+        recalcular();
     }
 
     function obtenerPrecioNinoPorEdadEnBase(edad) {
