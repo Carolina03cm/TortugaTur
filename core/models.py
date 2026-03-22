@@ -56,21 +56,6 @@ class Tour(models.Model):
         return self.precio_nino if self.precio_nino and self.precio_nino > 0 else self.precio
 
 
-class TourVisit(models.Model):
-    tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name="visitas_ip")
-    ip_address = models.GenericIPAddressField()
-    first_seen = models.DateTimeField(auto_now_add=True)
-    last_seen = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["tour", "ip_address"], name="unique_tour_visit_ip"),
-        ]
-
-    def __str__(self):
-        return f"{self.tour.nombre} - {self.ip_address}"
-
-
 class SiteVisit(models.Model):
     ip_address = models.GenericIPAddressField(unique=True)
     first_seen = models.DateTimeField(auto_now_add=True)
