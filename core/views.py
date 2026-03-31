@@ -157,12 +157,10 @@ def _whatsapp_reserva_interna_url(reserva):
     telefono = _telefono_para_whatsapp(getattr(reserva, "telefono", ""))
     if not telefono:
         return ""
-    checkout_url = f"{_site_url(request=None)}{reverse('checkout_reserva', args=[reserva.id])}"
     mensaje = (
         f"Hola {reserva.nombre or ''}, tu cotizacion para el tour "
         f"{reserva.salida.tour.nombre} ya esta lista. "
-        f"Total a pagar: ${reserva.total_pagar} USD. "
-        f"Puedes revisar y pagar aqui: {checkout_url}"
+        f"El valor asignado a pagar es de ${reserva.total_pagar} USD."
     ).strip()
     return f"https://wa.me/{telefono}?{urlencode({'text': mensaje})}"
 
@@ -2410,6 +2408,9 @@ def registrar_monto_reserva_interna(request, reserva_id):
         return _redir_admin_reservas(request, "general")
     if reserva.estado != ESTADO_COTIZACION_PENDIENTE:
         messages.error(request, "Solo puedes asignar monto a reservas internas pendientes de cotizacion.")
+        return _redir_admin_reservas(request, "general")
+    if (reserva.total_pagar or Decimal("0.00")) > 0:
+        messages.warning(request, "Esta reserva ya tiene un monto asignado y no se puede modificar.")
         return _redir_admin_reservas(request, "general")
 
     monto = _parse_decimal(request.POST.get("monto_pagado"))
