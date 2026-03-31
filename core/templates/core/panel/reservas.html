@@ -302,6 +302,22 @@
                                         <i class="fa-brands fa-whatsapp"></i>
                                         WhatsApp cliente
                                     </a>
+                                    {% else %}
+                                    <form method="post" action="{% url 'actualizar_telefono_reserva_interna' r.id %}" class="flex items-center gap-2 justify-center">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="tipo" value="general">
+                                        {% if request.GET.fecha %}<input type="hidden" name="fecha" value="{{ request.GET.fecha }}">{% endif %}
+                                        <input type="text" name="telefono" value="{{ r.telefono|default:'' }}"
+                                            class="w-36 border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold"
+                                            placeholder="Telefono cliente">
+                                        <button type="submit"
+                                            class="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+                                            Guardar telefono
+                                        </button>
+                                    </form>
+                                    <span class="bg-rose-50 text-rose-700 px-3 py-1 rounded-lg text-xs font-bold">
+                                        WhatsApp no disponible, revisar telefono
+                                    </span>
                                     {% endif %}
                                     {% else %}
                                     <span class="bg-amber-50 text-amber-700 px-3 py-1 rounded-lg text-xs font-bold">

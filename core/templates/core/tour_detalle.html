@@ -552,9 +552,19 @@
                             <input type="text" name="nombre" value="{{ user.first_name }}" placeholder="Nombre"
                                 class="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 outline-none focus:ring-4 focus:ring-primary/10 font-bold"
                                 required>
-                            <input type="tel" name="telefono" placeholder="WhatsApp (Ej: +593...)"
-                                class="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 outline-none focus:ring-4 focus:ring-primary/10 font-bold"
-                                required>
+                            <div class="grid grid-cols-[170px_1fr] gap-3">
+                                <select name="telefono_codigo"
+                                    class="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 outline-none focus:ring-4 focus:ring-primary/10 font-bold"
+                                    required>
+                                    {% for code, label in phone_country_codes %}
+                                    <option value="{{ code }}" {% if code == "593" %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="tel" name="telefono_numero" placeholder="Numero de WhatsApp"
+                                    class="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 outline-none focus:ring-4 focus:ring-primary/10 font-bold"
+                                    required>
+                            </div>
+                            <p class="text-xs text-slate-400 -mt-2">Selecciona el pais y escribe el numero sin codigo internacional.</p>
                             <input type="text" name="identificacion" placeholder="Cedula o Pasaporte"
                                 class="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 outline-none focus:ring-4 focus:ring-primary/10 font-bold"
                                 required>

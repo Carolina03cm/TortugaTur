@@ -57,6 +57,16 @@ ESTADOS_AGENCIA_ACTIVOS = [
     "bloqueada_por_agencia",
 ]
 ESTADO_COTIZACION_PENDIENTE = "cotizacion_pendiente"
+PHONE_COUNTRY_CODES = [
+    ("593", "Ecuador (+593)"),
+    ("57", "Colombia (+57)"),
+    ("51", "Peru (+51)"),
+    ("56", "Chile (+56)"),
+    ("54", "Argentina (+54)"),
+    ("52", "Mexico (+52)"),
+    ("1", "Estados Unidos (+1)"),
+    ("34", "Espana (+34)"),
+]
 
 
 def _filtrar_tours_para_usuario(qs, user):
@@ -114,6 +124,33 @@ def _telefono_para_whatsapp(telefono):
     if len(digits) == 9:
         return f"593{digits}"
     return digits if len(digits) >= 8 else ""
+
+
+def _telefono_desde_form(post_data, field_name="telefono", code_field="telefono_codigo", number_field="telefono_numero"):
+    telefono_directo = (post_data.get(field_name) or "").strip()
+    if telefono_directo:
+        return telefono_directo
+
+    codigo = re.sub(r"\D+", "", (post_data.get(code_field) or "").strip())
+    numero = re.sub(r"\D+", "", (post_data.get(number_field) or "").strip())
+    if not numero:
+        return ""
+    if codigo and numero.startswith("0"):
+        numero = numero[1:]
+    return f"+{codigo}{numero}" if codigo else numero
+
+
+def _telefono_normalizado_desde_form(post_data, field_name="telefono", code_field="telefono_codigo", number_field="telefono_numero"):
+    telefono = _telefono_desde_form(
+        post_data,
+        field_name=field_name,
+        code_field=code_field,
+        number_field=number_field,
+    )
+    telefono_whatsapp = _telefono_para_whatsapp(telefono)
+    if telefono_whatsapp:
+        return f"+{telefono_whatsapp}"
+    return (telefono or "").strip()
 
 
 def _whatsapp_reserva_interna_url(reserva):
@@ -358,7 +395,7 @@ def tour_detalle(request, pk):
             ninos = int(request.POST.get("ninos", 0))
             edades_ninos_raw = request.POST.getlist("edades_ninos")
             nombre = request.POST.get("nombre", "")
-            telefono = request.POST.get("telefono", "")
+            telefono = _telefono_normalizado_desde_form(request.POST)
             identificacion = request.POST.get("identificacion", "")
             edades_ninos = []
             aplica_descuento_ninos = _aplica_descuento_ninos(tour, request.user)
@@ -718,6 +755,7 @@ def tour_detalle(request, pk):
         "tour_no_incluye_items": _texto_a_items(tour.no_incluye),
         "tour_recomendaciones_items": _texto_a_items(tour.recomendaciones),
         "tour_info_importante_items": _texto_a_items(tour.informacion_importante),
+        "phone_country_codes": PHONE_COUNTRY_CODES,
     })
 
 @login_required
@@ -1988,6 +2026,7 @@ def admin_agencias_sin_pago(request):
         else:
             reserva.estado_mostrar = reserva.estado
         reserva.whatsapp_url_cliente = _whatsapp_reserva_interna_url(reserva) if _es_reserva_interna(reserva) and (reserva.total_pagar or Decimal("0.00")) > 0 else ""
+        reserva.whatsapp_cliente_disponible = bool(reserva.whatsapp_url_cliente)
 
     return render(
         request,
@@ -2384,6 +2423,30 @@ def registrar_monto_reserva_interna(request, reserva_id):
         f"Monto asignado en reserva #{reserva.id:06d} por ${monto}. "
         f"{'Se envio correo al cliente.' if envio_correo else 'El cliente ya puede pagar desde Mis Reservas.'}",
     )
+    return _redir_admin_reservas(request, "general")
+
+
+@login_required
+@user_passes_test(es_admin_o_secretaria)
+@require_POST
+def actualizar_telefono_reserva_interna(request, reserva_id):
+    reserva = get_object_or_404(Reserva.objects.select_related("salida__tour"), id=reserva_id)
+    if _es_reserva_agencia(reserva):
+        messages.error(request, "La reserva seleccionada corresponde a una agencia.")
+        return _redir_admin_reservas(request, "general")
+    if not _es_reserva_interna(reserva):
+        messages.error(request, "Solo puedes actualizar telefono en reservas internas.")
+        return _redir_admin_reservas(request, "general")
+
+    telefono = _telefono_normalizado_desde_form(request.POST)
+    if not _telefono_para_whatsapp(telefono):
+        messages.error(request, "Ingresa un telefono valido para WhatsApp.")
+        return _redir_admin_reservas(request, "general")
+
+    reserva.telefono = telefono
+    reserva.gestionada_por = request.user
+    reserva.save(update_fields=["telefono", "gestionada_por"])
+    messages.success(request, f"Telefono actualizado en reserva #{reserva.id:06d}.")
     return _redir_admin_reservas(request, "general")
 
 @login_required
