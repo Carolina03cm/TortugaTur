@@ -4,34 +4,155 @@
 
 {% block content %}
 <div class="bg-slate-50 min-h-screen py-12">
-    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-            <div class="flex items-center justify-between mb-6">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="bg-white rounded-3xl shadow-xl shadow-primary/5 border border-primary/10 overflow-hidden">
+            <div class="px-8 py-6 border-b border-primary/10 bg-primary/5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 class="text-2xl font-black text-slate-900">Editar Tour</h1>
-                    <p class="text-slate-500 mt-1">{{ tour.nombre }}</p>
+                    <p class="text-[11px] font-black uppercase tracking-[0.16em] text-primary">Edicion</p>
+                    <h1 class="text-3xl font-black text-primary-dark mt-1">Editar Tour</h1>
+                    <p class="text-slate-500 mt-2">{{ tour.nombre }}</p>
                 </div>
-                <a href="{% url 'admin_tours' %}" class="bg-white border border-slate-200 px-4 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition">
+                <a href="{% url 'admin_tours' %}" class="bg-white border border-primary/20 px-4 py-2 rounded-xl font-bold text-primary-dark hover:bg-primary/5 transition w-max">
                     Volver
                 </a>
             </div>
 
-            <form method="post" class="space-y-4">
+            <form method="post" class="p-6 md:p-8 space-y-5">
                 {% csrf_token %}
-                {% for field in form %}
-                <div>
-                    <label class="block text-xs font-black uppercase text-slate-400 mb-1 ml-1">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.errors %}
-                    <p class="text-red-600 text-xs mt-1">{{ field.errors|striptags }}</p>
-                    {% endif %}
+
+                <div class="rounded-2xl border border-primary/10 overflow-hidden">
+                    <div class="px-5 py-4 bg-primary/5 border-b border-primary/10">
+                        <h3 class="text-sm font-black uppercase tracking-[0.14em] text-primary-dark">1. Identidad del Tour</h3>
+                    </div>
+                    <div class="p-5 space-y-4">
+                        {% for field in form %}
+                            {% if field.name == 'nombre' or field.name == 'destino' or field.name == 'descripcion' %}
+                            <div>
+                                <label for="{{ field.id_for_label }}" class="block text-[11px] font-black uppercase tracking-[0.08em] text-primary-dark/80 mb-1">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
+                                {% if field.errors %}<p class="text-xs text-rose-600 mt-1">{{ field.errors|striptags }}</p>{% endif %}
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
                 </div>
-                {% endfor %}
-                <button type="submit" class="w-full py-4 bg-primary text-white rounded-xl font-black hover:bg-slate-900 transition-all shadow-lg shadow-primary/20 mt-4">
-                    GUARDAR CAMBIOS
-                </button>
+
+                <div class="rounded-2xl border border-primary/10 overflow-hidden">
+                    <div class="px-5 py-4 bg-primary/5 border-b border-primary/10">
+                        <h3 class="text-sm font-black uppercase tracking-[0.14em] text-primary-dark">2. Contenido Comercial</h3>
+                    </div>
+                    <div class="p-5 space-y-4">
+                        {% for field in form %}
+                            {% if field.name == 'descripcion_experiencia' or field.name == 'incluye' or field.name == 'no_incluye' or field.name == 'recomendaciones' or field.name == 'informacion_importante' or field.name == 'nota_importante' %}
+                            <div>
+                                <label for="{{ field.id_for_label }}" class="block text-[11px] font-black uppercase tracking-[0.08em] text-primary-dark/80 mb-1">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
+                                {% if field.errors %}<p class="text-xs text-rose-600 mt-1">{{ field.errors|striptags }}</p>{% endif %}
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-primary/10 overflow-hidden">
+                    <div class="px-5 py-4 bg-primary/5 border-b border-primary/10">
+                        <h3 class="text-sm font-black uppercase tracking-[0.14em] text-primary-dark">3. Operacion</h3>
+                    </div>
+                    <div class="p-5 grid md:grid-cols-2 gap-4">
+                        {% for field in form %}
+                            {% if field.name == 'duracion' or field.name == 'idiomas' or field.name == 'nivel_dificultad' or field.name == 'cupo_maximo' or field.name == 'hora_turno_1' or field.name == 'hora_turno_2' %}
+                            <div class="{% if field.name == 'duracion' %}md:col-span-2{% endif %}">
+                                <label for="{{ field.id_for_label }}" class="block text-[11px] font-black uppercase tracking-[0.08em] text-primary-dark/80 mb-1">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
+                                {% if field.errors %}<p class="text-xs text-rose-600 mt-1">{{ field.errors|striptags }}</p>{% endif %}
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-primary/10 overflow-hidden">
+                    <div class="px-5 py-4 bg-primary/5 border-b border-primary/10">
+                        <h3 class="text-sm font-black uppercase tracking-[0.14em] text-primary-dark">4. Cobro y Visibilidad</h3>
+                    </div>
+                    <div class="p-5 space-y-4">
+                        <div class="grid md:grid-cols-3 gap-4">
+                            {% for field in form %}
+                                {% if field.name == 'precio' or field.name == 'precio_adulto' or field.name == 'precio_nino' %}
+                                <div>
+                                    <label for="{{ field.id_for_label }}" class="block text-[11px] font-black uppercase tracking-[0.08em] text-primary-dark/80 mb-1">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
+                                    {% if field.errors %}<p class="text-xs text-rose-600 mt-1">{{ field.errors|striptags }}</p>{% endif %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+
+                        <div class="grid md:grid-cols-2 gap-3">
+                            {% for field in form %}
+                                {% if field.name == 'descuento_ninos_activo' or field.name == 'descuento_ninos_agencia_activo' or field.name == 'visible_para_agencias' or field.name == 'ocultar_precio' %}
+                                <label for="{{ field.id_for_label }}" class="flex items-start gap-3 rounded-2xl border border-primary/10 bg-primary/5 p-4 hover:border-primary/30 cursor-pointer">
+                                    <div class="pt-0.5">{{ field }}</div>
+                                    <div>
+                                        <p class="text-sm font-bold text-primary-dark">{{ field.label }}</p>
+                                        {% if field.help_text %}<p class="text-xs text-slate-500 mt-1">{{ field.help_text }}</p>{% endif %}
+                                        {% if field.errors %}<p class="text-xs text-rose-600 mt-1">{{ field.errors|striptags }}</p>{% endif %}
+                                    </div>
+                                </label>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+
+                        <div>
+                            {% for field in form %}
+                                {% if field.name == 'lemonsqueezy_variant_id' %}
+                                <label for="{{ field.id_for_label }}" class="block text-[11px] font-black uppercase tracking-[0.08em] text-primary-dark/80 mb-1">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
+                                {% if field.errors %}<p class="text-xs text-rose-600 mt-1">{{ field.errors|striptags }}</p>{% endif %}
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sticky bottom-4 rounded-2xl border border-primary/10 bg-white/95 backdrop-blur p-4 shadow-lg shadow-primary/10">
+                    <div class="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                        <p class="text-sm text-slate-500">Guarda los cambios cuando termines de revisar la ficha del tour.</p>
+                        <button type="submit" class="px-6 py-4 bg-primary text-white rounded-xl font-black hover:bg-primary-dark transition-all shadow-lg shadow-primary/20">
+                            Guardar cambios
+                        </button>
+                    </div>
+                </div>
             </form>
         </div>
     </div>
 </div>
+
+<style>
+    input[type="text"], input[type="number"], input[type="time"], textarea, select {
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: .95rem;
+        padding: .85rem 1rem;
+        font-weight: 600;
+        color: #0f172a;
+        background: #fff;
+    }
+
+    input[type="text"]:focus, input[type="number"]:focus, input[type="time"]:focus, textarea:focus, select:focus {
+        outline: none;
+        border-color: #007e37;
+        box-shadow: 0 0 0 3px rgba(0,126,55,.12);
+    }
+
+    input[type="checkbox"] {
+        width: 1.1rem;
+        height: 1.1rem;
+    }
+</style>
 {% endblock %}

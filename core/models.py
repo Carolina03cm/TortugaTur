@@ -17,7 +17,60 @@ class Destino(models.Model):
 class Tour(models.Model):
     nombre = models.CharField(max_length=150)
     destino = models.ForeignKey(Destino, on_delete=models.CASCADE, related_name="tours")
-    descripcion = models.TextField()
+    descripcion = models.TextField(
+        verbose_name="Descripcion corta",
+        help_text="Resumen breve para tarjetas, listados y encabezado del tour.",
+    )
+    descripcion_experiencia = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Descripcion de la experiencia",
+        help_text="Texto completo del recorrido. Puedes pegar varios parrafos.",
+    )
+    incluye = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Incluye",
+        help_text="Escribe un item por linea.",
+    )
+    no_incluye = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="No incluye",
+        help_text="Escribe un item por linea.",
+    )
+    recomendaciones = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Recomendaciones",
+        help_text="Escribe un item por linea.",
+    )
+    informacion_importante = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Informacion importante",
+        help_text="Escribe un item por linea.",
+    )
+    nota_importante = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Nota importante",
+        help_text="Observaciones finales o aclaraciones del tour.",
+    )
+    idiomas = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        verbose_name="Idiomas",
+        help_text="Ej: Espanol / Ingles",
+    )
+    nivel_dificultad = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        verbose_name="Nivel de dificultad",
+        help_text="Ej: Facil, Media, Alta",
+    )
     precio = models.DecimalField(max_digits=8, decimal_places=2)
     precio_adulto = models.DecimalField(max_digits=8, decimal_places=2, default=0, blank=True)
     precio_nino = models.DecimalField(max_digits=8, decimal_places=2, default=0, blank=True)
@@ -44,6 +97,11 @@ class Tour(models.Model):
         default=True,
         verbose_name="Visible para agencias",
         help_text="Si se desactiva, este tour no aparecera para cuentas de agencia.",
+    )
+    ocultar_precio = models.BooleanField(
+        default=False,
+        verbose_name="Ocultar precio al cliente",
+        help_text="Si se activa, el tour no mostrara tarifa publica y la reserva se gestionara internamente.",
     )
 
     def __str__(self):
@@ -92,6 +150,7 @@ class Reserva(models.Model):
 
     ESTADOS = (
         ("pendiente", "Pendiente"),
+        ("cotizacion_pendiente", "Cotizacion Pendiente"),
         ("solicitud_agencia", "Solicitud Agencia"),
         ("cotizada_agencia", "Cotizada Agencia"),
         ("confirmada_agencia", "Confirmada Agencia"),

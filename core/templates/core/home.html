@@ -292,7 +292,11 @@
           {{ tour.duracion|default:"Medio día" }}
         </div>
         <div class="flex justify-between items-center">
-          <span class="font-bold text-primary">${{ tour.precio }}</span>
+          {% if tour.ocultar_precio %}
+          <span class="font-bold text-slate-700">Consultar</span>
+          {% else %}
+          <span class="font-bold text-primary">{{ currency_code }} {{ tour.precio_adulto_display|floatformat:2 }}</span>
+          {% endif %}
           <a href="{% url 'tour_detalle' tour.id %}" class="text-sm font-semibold text-primary hover:underline">
             Ver detalles
           </a>

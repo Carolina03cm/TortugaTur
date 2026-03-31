@@ -1,4 +1,4 @@
-﻿{% extends "core/base.html" %}
+{% extends "core/base.html" %}
 
 {% block title %}Tours | TortugaTur{% endblock %}
 
@@ -9,8 +9,29 @@
 <style>
   .fc-event { cursor: pointer; }
   .fc-toolbar-title { font-weight: 800 !important; }
-  .fc-button-primary { background-color: #0f172a !important; border-color: #0f172a !important; }
-  .fc-button-primary:hover { background-color: #0f766e !important; border-color: #0f766e !important; }
+  .fc-button-primary { background-color: #007e37 !important; border-color: #007e37 !important; }
+  .fc-button-primary:hover { background-color: #01532d !important; border-color: #01532d !important; }
+
+  input[type="text"], input[type="number"], input[type="time"], textarea, select {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: .95rem;
+    padding: .85rem 1rem;
+    font-weight: 600;
+    color: #0f172a;
+    background: #fff;
+  }
+
+  input[type="text"]:focus, input[type="number"]:focus, input[type="time"]:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: #007e37;
+    box-shadow: 0 0 0 3px rgba(0,126,55,.12);
+  }
+
+  input[type="checkbox"] {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
 </style>
 {% endblock %}
 
@@ -18,21 +39,21 @@
 <div class="min-h-screen bg-slate-100 py-8">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
-    <section class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+    <section class="bg-gradient-to-r from-primary-dark to-primary border border-primary-dark rounded-3xl p-6 shadow-xl shadow-primary/15 text-white">
       <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <p class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Catalogo</p>
-          <h1 class="text-3xl font-black text-slate-900">Gestion de Tours</h1>
-          <p class="text-sm text-slate-500 mt-1">Crea tours, ajusta precios y administra su disponibilidad.</p>
+          <p class="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-100/80">Catalogo</p>
+          <h1 class="text-3xl font-black text-white">Gestion de Tours</h1>
+          <p class="text-sm text-emerald-50/85 mt-1">Crea tours con informacion clara, precios y configuracion operativa.</p>
         </div>
-        <a href="{% url 'panel_admin' %}" class="h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-bold inline-flex items-center gap-2 hover:border-slate-300 w-max">
+        <a href="{% url 'panel_admin' %}" class="h-10 px-4 rounded-xl border border-white/20 bg-white/10 text-white text-sm font-bold inline-flex items-center gap-2 hover:bg-white/20 w-max">
           <span class="material-icons text-[18px]">arrow_back</span>Panel
         </a>
       </div>
     </section>
 
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-      <section class="xl:col-span-1 space-y-4">
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+      <section class="xl:col-span-5 space-y-4">
         {% if solo_lectura %}
         <div class="rounded-2xl border border-amber-200 bg-amber-50 text-amber-800 px-4 py-3 text-sm font-semibold">
           Modo solo lectura. Puedes consultar tours y calendario.
@@ -40,33 +61,145 @@
         {% endif %}
 
         {% if not solo_lectura %}
-        <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
-          <h2 class="text-lg font-extrabold text-slate-900 mb-4">Nuevo tour</h2>
-          <form method="post" class="space-y-4">
+        <div class="bg-white border border-primary/10 rounded-3xl shadow-xl shadow-primary/5 overflow-hidden">
+          <div class="px-6 py-5 border-b border-primary/10 bg-primary/5">
+            <p class="text-[11px] font-black uppercase tracking-[0.14em] text-primary">Formulario</p>
+            <h2 class="text-2xl font-black text-primary-dark mt-1">Nuevo tour</h2>
+            <p class="text-sm text-slate-500 mt-2">Llena primero lo esencial. Los bloques de contenido te ayudan a cargar la ficha completa sin perderte.</p>
+          </div>
+
+          <form method="post" class="p-6 space-y-5">
             {% csrf_token %}
-            {% for field in form %}
-            <div>
-              <label for="{{ field.id_for_label }}" class="block text-[11px] font-black uppercase tracking-[0.08em] text-slate-500 mb-1">{{ field.label }}</label>
-              {{ field }}
-              {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
-              {% if field.errors %}<p class="text-xs text-rose-600 mt-1">{{ field.errors }}</p>{% endif %}
+
+            <div class="rounded-2xl border border-primary/10 overflow-hidden">
+              <div class="px-5 py-4 bg-primary/5 border-b border-primary/10">
+                <h3 class="text-sm font-black uppercase tracking-[0.14em] text-primary-dark">1. Identidad del Tour</h3>
+                <p class="text-xs text-slate-500 mt-1">Nombre, destino y resumen para que el tour se entienda rapido.</p>
+              </div>
+              <div class="p-5 space-y-4">
+                {% for field in form %}
+                  {% if field.name == 'nombre' or field.name == 'destino' or field.name == 'descripcion' %}
+                  <div>
+                    <label for="{{ field.id_for_label }}" class="block text-[11px] font-black uppercase tracking-[0.08em] text-primary-dark/80 mb-1">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
+                    {% if field.errors %}<p class="text-xs text-rose-600 mt-1">{{ field.errors|striptags }}</p>{% endif %}
+                  </div>
+                  {% endif %}
+                {% endfor %}
+              </div>
             </div>
-            {% endfor %}
-            <button type="submit" class="w-full h-11 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800">Crear tour</button>
+
+            <div class="rounded-2xl border border-primary/10 overflow-hidden">
+              <div class="px-5 py-4 bg-primary/5 border-b border-primary/10">
+                <h3 class="text-sm font-black uppercase tracking-[0.14em] text-primary-dark">2. Contenido Comercial</h3>
+                <p class="text-xs text-slate-500 mt-1">Aqui pegas la ficha larga del tour. En listas, usa un item por linea.</p>
+              </div>
+              <div class="p-5 space-y-4">
+                {% for field in form %}
+                  {% if field.name == 'descripcion_experiencia' or field.name == 'incluye' or field.name == 'no_incluye' or field.name == 'recomendaciones' or field.name == 'informacion_importante' or field.name == 'nota_importante' %}
+                  <div>
+                    <label for="{{ field.id_for_label }}" class="block text-[11px] font-black uppercase tracking-[0.08em] text-primary-dark/80 mb-1">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
+                    {% if field.errors %}<p class="text-xs text-rose-600 mt-1">{{ field.errors|striptags }}</p>{% endif %}
+                  </div>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="rounded-2xl border border-primary/10 overflow-hidden">
+              <div class="px-5 py-4 bg-primary/5 border-b border-primary/10">
+                <h3 class="text-sm font-black uppercase tracking-[0.14em] text-primary-dark">3. Operacion</h3>
+                <p class="text-xs text-slate-500 mt-1">Datos rapidos para mostrar y usar al programar salidas.</p>
+              </div>
+              <div class="p-5 grid md:grid-cols-2 gap-4">
+                {% for field in form %}
+                  {% if field.name == 'duracion' or field.name == 'idiomas' or field.name == 'nivel_dificultad' or field.name == 'cupo_maximo' or field.name == 'hora_turno_1' or field.name == 'hora_turno_2' %}
+                  <div class="{% if field.name == 'duracion' %}md:col-span-2{% endif %}">
+                    <label for="{{ field.id_for_label }}" class="block text-[11px] font-black uppercase tracking-[0.08em] text-primary-dark/80 mb-1">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
+                    {% if field.errors %}<p class="text-xs text-rose-600 mt-1">{{ field.errors|striptags }}</p>{% endif %}
+                  </div>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="rounded-2xl border border-primary/10 overflow-hidden">
+              <div class="px-5 py-4 bg-primary/5 border-b border-primary/10">
+                <h3 class="text-sm font-black uppercase tracking-[0.14em] text-primary-dark">4. Cobro y Visibilidad</h3>
+                <p class="text-xs text-slate-500 mt-1">Define precios publicos, descuentos y si el tour debe trabajar con tarifa interna.</p>
+              </div>
+              <div class="p-5 space-y-4">
+                <div class="grid md:grid-cols-3 gap-4">
+                  {% for field in form %}
+                    {% if field.name == 'precio' or field.name == 'precio_adulto' or field.name == 'precio_nino' %}
+                    <div>
+                      <label for="{{ field.id_for_label }}" class="block text-[11px] font-black uppercase tracking-[0.08em] text-primary-dark/80 mb-1">{{ field.label }}</label>
+                      {{ field }}
+                      {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
+                      {% if field.errors %}<p class="text-xs text-rose-600 mt-1">{{ field.errors|striptags }}</p>{% endif %}
+                    </div>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-3">
+                  {% for field in form %}
+                    {% if field.name == 'descuento_ninos_activo' or field.name == 'descuento_ninos_agencia_activo' or field.name == 'visible_para_agencias' or field.name == 'ocultar_precio' %}
+                    <label for="{{ field.id_for_label }}" class="flex items-start gap-3 rounded-2xl border border-primary/10 bg-primary/5 p-4 hover:border-primary/30 cursor-pointer">
+                      <div class="pt-0.5">{{ field }}</div>
+                      <div>
+                        <p class="text-sm font-bold text-primary-dark">{{ field.label }}</p>
+                        {% if field.help_text %}<p class="text-xs text-slate-500 mt-1">{{ field.help_text }}</p>{% endif %}
+                        {% if field.errors %}<p class="text-xs text-rose-600 mt-1">{{ field.errors|striptags }}</p>{% endif %}
+                      </div>
+                    </label>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+
+                <div>
+                  {% for field in form %}
+                    {% if field.name == 'lemonsqueezy_variant_id' %}
+                    <label for="{{ field.id_for_label }}" class="block text-[11px] font-black uppercase tracking-[0.08em] text-primary-dark/80 mb-1">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
+                    {% if field.errors %}<p class="text-xs text-rose-600 mt-1">{{ field.errors|striptags }}</p>{% endif %}
+                    {% endif %}
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <div class="sticky bottom-4 rounded-2xl border border-primary/10 bg-white/95 backdrop-blur p-4 shadow-lg shadow-primary/10">
+              <div class="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                <p class="text-sm text-slate-500">Cuando guardes, luego podras programar salidas desde el calendario.</p>
+                <button type="submit" class="h-12 px-6 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-dark shadow-lg shadow-primary/20">
+                  Crear tour
+                </button>
+              </div>
+            </div>
           </form>
         </div>
         {% endif %}
       </section>
 
-      <section class="xl:col-span-2 space-y-6">
-        <div class="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
-          <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-            <h3 class="text-lg font-extrabold text-slate-900">Listado de tours</h3>
-            <span class="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-700">{{ tours|length }} tours</span>
+      <section class="xl:col-span-7 space-y-6">
+        <div class="bg-white border border-primary/10 rounded-3xl shadow-xl shadow-primary/5 overflow-hidden">
+          <div class="px-6 py-4 border-b border-primary/10 bg-primary/5 flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-extrabold text-primary-dark">Listado de tours</h3>
+              <p class="text-sm text-slate-500">Vista rapida del catalogo ya creado.</p>
+            </div>
+            <span class="text-xs font-bold px-3 py-1 rounded-full bg-primary/10 text-primary-dark">{{ tours|length }} tours</span>
           </div>
           <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-slate-950 text-white text-[10px] uppercase tracking-[0.16em]">
+            <table class="w-full text-sm min-w-[780px]">
+              <thead class="bg-primary-dark text-white text-[10px] uppercase tracking-[0.16em]">
                 <tr>
                   <th class="px-6 py-4 text-left">Tour</th>
                   <th class="px-6 py-4 text-left">Destino</th>
@@ -81,23 +214,30 @@
                 <tr class="hover:bg-slate-50">
                   <td class="px-6 py-4">
                     <p class="font-bold text-slate-900">{{ tour.nombre }}</p>
-                    <p class="text-xs text-slate-500 truncate max-w-[240px]" title="{{ tour.descripcion }}">{{ tour.descripcion }}</p>
+                    <p class="text-xs text-slate-500 truncate max-w-[260px]" title="{{ tour.descripcion }}">{{ tour.descripcion }}</p>
                   </td>
-                  <td class="px-6 py-4"><span class="px-2 py-1 bg-slate-100 rounded-md text-slate-700 font-semibold">{{ tour.destino.nombre }}</span></td>
                   <td class="px-6 py-4">
+                    <span class="px-2 py-1 bg-primary/10 rounded-md text-primary-dark font-semibold">{{ tour.destino.nombre }}</span>
+                  </td>
+                  <td class="px-6 py-4">
+                    {% if tour.ocultar_precio %}
+                    <p class="font-bold text-slate-900">Tarifa interna</p>
+                    <p class="text-xs text-slate-600">No visible al cliente</p>
+                    {% else %}
                     {% with p_adulto=tour.precio_adulto|default:tour.precio %}
                     <p class="font-bold text-slate-900">Adulto: ${{ p_adulto }}</p>
                     {% endwith %}
                     {% with p_nino=tour.precio_nino|default:tour.precio %}
                     <p class="text-xs text-slate-600">Nino: ${{ p_nino }}</p>
                     {% endwith %}
+                    {% endif %}
                   </td>
                   <td class="px-6 py-4 text-xs text-slate-600 font-mono">{% if tour.lemonsqueezy_variant_id %}{{ tour.lemonsqueezy_variant_id }}{% else %}-{% endif %}</td>
                   <td class="px-6 py-4"><span class="font-mono text-slate-700">{{ tour.cupo_maximo }}</span></td>
                   <td class="px-6 py-4 text-right">
                     {% if not solo_lectura %}
                     <div class="inline-flex items-center gap-2">
-                      <a href="{% url 'editar_tour' tour.id %}" class="h-9 px-3 rounded-lg bg-slate-900 text-white text-xs font-bold inline-flex items-center hover:bg-slate-800">Editar</a>
+                      <a href="{% url 'editar_tour' tour.id %}" class="h-9 px-3 rounded-lg bg-primary text-white text-xs font-bold inline-flex items-center hover:bg-primary-dark">Editar</a>
                       <form method="post" action="{% url 'eliminar_tour' tour.id %}" class="inline" onsubmit="return confirm('Eliminar este tour y sus salidas?');">
                         {% csrf_token %}
                         <button type="submit" class="h-9 px-3 rounded-lg border border-rose-200 text-rose-600 text-xs font-bold hover:bg-rose-50">Borrar</button>
@@ -116,14 +256,14 @@
           </div>
         </div>
 
-        <div id="calendario" class="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
-          <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div id="calendario" class="bg-white border border-primary/10 rounded-3xl shadow-xl shadow-primary/5 overflow-hidden">
+          <div class="px-6 py-4 border-b border-primary/10 bg-primary/5 flex items-center justify-between">
             <div>
-              <h3 class="text-lg font-extrabold text-slate-900">Calendario de disponibilidad</h3>
+              <h3 class="text-lg font-extrabold text-primary-dark">Calendario de disponibilidad</h3>
               <p class="text-sm text-slate-500">Vista global de salidas y cupos.</p>
             </div>
             {% if not solo_lectura %}
-            <a href="{% url 'crear_salida' %}" class="h-10 px-4 rounded-xl bg-slate-900 text-white text-sm font-bold inline-flex items-center">Programar salida</a>
+            <a href="{% url 'crear_salida' %}" class="h-10 px-4 rounded-xl bg-primary text-white text-sm font-bold inline-flex items-center hover:bg-primary-dark shadow-lg shadow-primary/20">Programar salida</a>
             {% endif %}
           </div>
           <div class="p-4 sm:p-6">
@@ -135,45 +275,28 @@
   </div>
 </div>
 
-<style>
-  input[type="text"], input[type="number"], textarea, select {
-    width: 100%;
-    border: 1px solid #cbd5e1;
-    border-radius: .85rem;
-    padding: .65rem .8rem;
-    font-weight: 600;
-    color: #0f172a;
-    background: #fff;
-  }
-  input[type="text"]:focus, input[type="number"]:focus, textarea:focus, select:focus {
-    outline: none;
-    border-color: #0f766e;
-    box-shadow: 0 0 0 3px rgba(15,118,110,.12);
-  }
-</style>
-
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     var calendarEl = document.getElementById('calendar-container');
-    if (!calendarEl) return;
-
-    var calendar = new FullCalendar.Calendar(calendarEl, {
-      locale: 'es',
-      initialView: 'dayGridMonth',
-      headerToolbar: {
-        left: 'prev,next today',
-        center: 'title',
-        right: 'dayGridMonth,timeGridWeek'
-      },
-      events: {{ salidas_json|safe }},
-      eventClick: function (info) {
-        if (info.event.url) {
-          window.location.href = info.event.url;
-          info.jsEvent.preventDefault();
+    if (calendarEl) {
+      var calendar = new FullCalendar.Calendar(calendarEl, {
+        locale: 'es',
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'dayGridMonth,timeGridWeek'
+        },
+        events: {{ salidas_json|safe }},
+        eventClick: function (info) {
+          if (info.event.url) {
+            window.location.href = info.event.url;
+            info.jsEvent.preventDefault();
+          }
         }
-      }
-    });
-    calendar.render();
+      });
+      calendar.render();
+    }
   });
 </script>
 {% endblock %}

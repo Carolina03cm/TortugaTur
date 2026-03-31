@@ -56,6 +56,7 @@ ESTADOS_AGENCIA_ACTIVOS = [
     "pagada_parcial_agencia",
     "bloqueada_por_agencia",
 ]
+ESTADO_COTIZACION_PENDIENTE = "cotizacion_pendiente"
 
 
 def _filtrar_tours_para_usuario(qs, user):
@@ -87,6 +88,46 @@ def _precio_nino_por_edad(edad_nino, tour=None, user=None):
     if edad_nino <= 5:
         return (base_price * ratio_3_5).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return base_price
+
+
+def _texto_a_items(texto):
+    if not texto:
+        return []
+    return [linea.strip() for linea in str(texto).splitlines() if linea.strip()]
+
+
+def _es_reserva_interna(reserva):
+    return bool(reserva and getattr(reserva, "estado", "") == ESTADO_COTIZACION_PENDIENTE)
+
+
+def _telefono_para_whatsapp(telefono):
+    digits = re.sub(r"\D+", "", telefono or "")
+    if not digits:
+        return ""
+    if digits.startswith("00"):
+        digits = digits[2:]
+    if digits.startswith("593") and len(digits) >= 11:
+        return digits
+    # Normalizacion por defecto para numeros locales de Ecuador.
+    if len(digits) == 10 and digits.startswith("0"):
+        return f"593{digits[1:]}"
+    if len(digits) == 9:
+        return f"593{digits}"
+    return digits if len(digits) >= 8 else ""
+
+
+def _whatsapp_reserva_interna_url(reserva):
+    telefono = _telefono_para_whatsapp(getattr(reserva, "telefono", ""))
+    if not telefono:
+        return ""
+    checkout_url = f"{_site_url(request=None)}{reverse('checkout_reserva', args=[reserva.id])}"
+    mensaje = (
+        f"Hola {reserva.nombre or ''}, tu cotizacion para el tour "
+        f"{reserva.salida.tour.nombre} ya esta lista. "
+        f"Total a pagar: ${reserva.total_pagar} USD. "
+        f"Puedes revisar y pagar aqui: {checkout_url}"
+    ).strip()
+    return f"https://wa.me/{telefono}?{urlencode({'text': mensaje})}"
 
 
 def _calcular_limite_pago_agencia(fecha_reserva):
@@ -566,12 +607,15 @@ def tour_detalle(request, pk):
             else:
                 # Flujo normal de Turista
                 # Calcular total a pagar (adulto/niÃ±o)
-                precio_adulto = tour.precio_adulto_final()
-                if aplica_descuento_ninos:
-                    total_ninos = sum(_precio_nino_por_edad(edad, tour=tour, user=request.user) for edad in edades_ninos)
+                if tour.ocultar_precio:
+                    total_pagar = Decimal("0.00")
                 else:
-                    total_ninos = ninos * precio_adulto
-                total_pagar = (adultos * precio_adulto) + total_ninos
+                    precio_adulto = tour.precio_adulto_final()
+                    if aplica_descuento_ninos:
+                        total_ninos = sum(_precio_nino_por_edad(edad, tour=tour, user=request.user) for edad in edades_ninos)
+                    else:
+                        total_ninos = ninos * precio_adulto
+                    total_pagar = (adultos * precio_adulto) + total_ninos
 
                 # Crear la reserva con estado PENDIENTE (hasta que pague)
                 reserva = Reserva.objects.create(
@@ -586,10 +630,21 @@ def tour_detalle(request, pk):
                     correo=request.user.email if request.user.is_authenticated else "",
                     telefono=telefono,
                     identificacion=identificacion,
-                    estado="pendiente"  # IMPORTANTE: Pendiente hasta que pague
+                    estado=ESTADO_COTIZACION_PENDIENTE if tour.ocultar_precio else "pendiente"
                 )
 
                 # NO descontamos cupos aquÃ­, se descontarÃ¡n despuÃ©s del pago
+
+                if tour.ocultar_precio:
+                    msg = "Reserva registrada. El equipo asignara el valor y luego podras pagarla desde Mis Reservas."
+                    if is_ajax:
+                        return JsonResponse({
+                            'success': True,
+                            'reserva_id': reserva.id,
+                            'redirect_url': reverse('mis_reservas')
+                        })
+                    messages.success(request, msg)
+                    return redirect('mis_reservas')
 
                 # Responder con la URL del checkout
                 if is_ajax:
@@ -658,6 +713,11 @@ def tour_detalle(request, pk):
         "child_price_3_5": str(_precio_nino_por_edad(4, tour=tour, user=request.user)),
         "child_price_normal": str(_precio_nino_por_edad(8, tour=tour, user=request.user)),
         "aplica_descuento_ninos": _aplica_descuento_ninos(tour, request.user),
+        "tour_oculta_precio": tour.ocultar_precio,
+        "tour_incluye_items": _texto_a_items(tour.incluye),
+        "tour_no_incluye_items": _texto_a_items(tour.no_incluye),
+        "tour_recomendaciones_items": _texto_a_items(tour.recomendaciones),
+        "tour_info_importante_items": _texto_a_items(tour.informacion_importante),
     })
 
 @login_required
@@ -1911,6 +1971,8 @@ def admin_agencias_sin_pago(request):
 
         if reserva.estado == "solicitud_agencia":
             reserva.estado_mostrar = "pendiente"
+        elif reserva.estado == ESTADO_COTIZACION_PENDIENTE:
+            reserva.estado_mostrar = "cotizacion lista" if (reserva.total_pagar or Decimal("0.00")) > 0 else "pendiente cotizacion"
         elif reserva.estado == "cotizada_agencia":
             reserva.estado_mostrar = "cotizada"
         elif reserva.estado == "confirmada_agencia":
@@ -1925,6 +1987,7 @@ def admin_agencias_sin_pago(request):
             reserva.estado_mostrar = "bloqueada agencia"
         else:
             reserva.estado_mostrar = reserva.estado
+        reserva.whatsapp_url_cliente = _whatsapp_reserva_interna_url(reserva) if _es_reserva_interna(reserva) and (reserva.total_pagar or Decimal("0.00")) > 0 else ""
 
     return render(
         request,
@@ -1946,8 +2009,7 @@ def admin_reservas_estado_json(request):
     reservas_query = (
         Reserva.objects.select_related("salida__tour")
         .prefetch_related("pagos")
-        .exclude(estado="pendiente")
-        .exclude(estado__in=["cancelada"])
+        .exclude(estado__in=["pendiente", "cancelada"])
     )
     reservas_agencia = reservas_query.filter(
         Q(tipo_reserva="agencia")
@@ -1994,7 +2056,7 @@ def cambiar_estado_reserva(request, reserva_id):
             messages.error(request, "Las reservas de agencia no se pueden modificar manualmente desde admin.")
             return redirect("admin_reservas")
         nuevo_estado = request.POST.get("estado")
-        if nuevo_estado in ["pendiente", "confirmada", "cancelada", "pagada"]:
+        if nuevo_estado in ["pendiente", ESTADO_COTIZACION_PENDIENTE, "confirmada", "cancelada", "pagada"]:
             estado_anterior = reserva.estado
             if nuevo_estado == "confirmada":
                 nuevo_estado = "pagada"
@@ -2293,6 +2355,36 @@ def registrar_monto_agencia(request, reserva_id):
 
     messages.success(request, f"Monto registrado en reserva #{reserva.id:06d} por ${monto}.")
     return _redir_admin_reservas(request, "agencia")
+
+
+@login_required
+@user_passes_test(es_admin_o_secretaria)
+@require_POST
+def registrar_monto_reserva_interna(request, reserva_id):
+    reserva = get_object_or_404(Reserva.objects.select_related("salida__tour"), id=reserva_id)
+    if _es_reserva_agencia(reserva):
+        messages.error(request, "La reserva seleccionada corresponde a una agencia.")
+        return _redir_admin_reservas(request, "general")
+    if reserva.estado != ESTADO_COTIZACION_PENDIENTE:
+        messages.error(request, "Solo puedes asignar monto a reservas internas pendientes de cotizacion.")
+        return _redir_admin_reservas(request, "general")
+
+    monto = _parse_decimal(request.POST.get("monto_pagado"))
+    if monto is None or monto <= 0:
+        messages.error(request, "Ingresa un monto valido mayor a 0.")
+        return _redir_admin_reservas(request, "general")
+
+    envio_correo = False
+    reserva.total_pagar = monto
+    reserva.gestionada_por = request.user
+    reserva.save(update_fields=["total_pagar", "gestionada_por"])
+    envio_correo = _send_internal_quote_ready_email(reserva)
+    messages.success(
+        request,
+        f"Monto asignado en reserva #{reserva.id:06d} por ${monto}. "
+        f"{'Se envio correo al cliente.' if envio_correo else 'El cliente ya puede pagar desde Mis Reservas.'}",
+    )
+    return _redir_admin_reservas(request, "general")
 
 @login_required
 @user_passes_test(es_admin_o_secretaria)
@@ -2613,7 +2705,7 @@ def panel_inicio(request):
     fecha_desde_raw = (request.GET.get("fecha_desde") or "").strip()
     fecha_hasta_raw = (request.GET.get("fecha_hasta") or "").strip()
     estado_filtro = (request.GET.get("estado") or "todos").strip().lower()
-    estados_validos = {"todos", "pendiente", "pagada", "cancelada", "solicitud_agencia", "bloqueada_por_agencia"}
+    estados_validos = {"todos", "pendiente", "cotizacion_pendiente", "pagada", "cancelada", "solicitud_agencia", "bloqueada_por_agencia"}
     if estado_filtro not in estados_validos:
         estado_filtro = "todos"
 
@@ -2631,6 +2723,7 @@ def panel_inicio(request):
         fecha_desde = fecha_hasta - timedelta(days=62)
 
     pendientes_agencia = Reserva.objects.filter(estado="solicitud_agencia").count()
+    pendientes_cotizacion_interna = Reserva.objects.filter(estado=ESTADO_COTIZACION_PENDIENTE).count()
     salidas_con_pocos_cupos = SalidaTour.objects.filter(fecha__gte=hoy, cupos_disponibles__lte=3).count()
     actividad_base = (
         Reserva.objects.select_related("salida__tour")
@@ -2681,6 +2774,14 @@ def panel_inicio(request):
             "detalle": f"{pendientes_agencia} pendientes por revisar",
             "fecha": timezone.now(),
             "url": f"{reverse('admin_reservas')}?tipo=agencia",
+        })
+    if pendientes_cotizacion_interna:
+        notificaciones.insert(0, {
+            "notif_id": f"cotizacion-interna-{pendientes_cotizacion_interna}",
+            "titulo": "Reservas internas",
+            "detalle": f"{pendientes_cotizacion_interna} pendiente(s) de cotizar",
+            "fecha": timezone.now(),
+            "url": f"{reverse('admin_reservas')}?tipo=general",
         })
 
     limite_7d = hoy - timedelta(days=7)
@@ -2785,6 +2886,7 @@ def panel_inicio(request):
         "kpi_reservas_hoy": Reserva.objects.filter(fecha_reserva__date=hoy).count(),
         "kpi_ingresos_hoy": Pago.objects.filter(estado="paid", creado_en__date=hoy).aggregate(total=Sum("monto")).get("total") or Decimal("0.00"),
         "kpi_pendientes_agencia": pendientes_agencia,
+        "kpi_pendientes_cotizacion": pendientes_cotizacion_interna,
         "kpi_bloqueos_agencia": Reserva.objects.filter(estado="bloqueada_por_agencia").count(),
         "kpi_salidas_alerta": salidas_con_pocos_cupos,
         "kpi_penalizaciones_hoy": Pago.objects.filter(
@@ -3060,7 +3162,7 @@ def descargar_reporte_rango_pdf(request):
     fecha_hasta_raw = (request.GET.get("fecha_hasta") or "").strip()
     estado_filtro = (request.GET.get("estado") or "todos").strip().lower()
     segmento = (request.GET.get("segmento") or "todos").strip().lower()
-    estados_validos = {"todos", "pendiente", "pagada", "cancelada", "solicitud_agencia", "bloqueada_por_agencia"}
+    estados_validos = {"todos", "pendiente", "cotizacion_pendiente", "pagada", "cancelada", "solicitud_agencia", "bloqueada_por_agencia"}
     segmentos_validos = {"todos", "usuarios", "secretarias", "agencias"}
     if estado_filtro not in estados_validos:
         estado_filtro = "todos"
@@ -3155,7 +3257,7 @@ def mis_reservas(request):
     _cancelar_reservas_agencia_vencidas()
     reservas = list(
         Reserva.objects.filter(usuario=request.user)
-        .exclude(estado__in=["pendiente", "cancelada"])
+        .exclude(estado="cancelada")
         .order_by('-fecha_reserva')
     )
     for reserva in reservas:
@@ -3263,6 +3365,11 @@ def _currency_context(request):
     return code, rate
 
 def _tour_price_display(tour, currency_rate, user=None):
+    if getattr(tour, "ocultar_precio", False):
+        return {
+            "adulto": Decimal("0.00"),
+            "nino": Decimal("0.00"),
+        }
     precio_adulto = tour.precio_adulto_final()
     precio_nino = tour.precio_nino_final() if _aplica_descuento_ninos(tour, user) else precio_adulto
     return {
@@ -3595,6 +3702,50 @@ def _send_ticket_email(reserva):
         logger.exception("No se pudo enviar ticket para la reserva %s", reserva.id)
 
 
+def _send_internal_quote_ready_email(reserva):
+    try:
+        def _clean_email(value):
+            email = (value or "").strip().lower()
+            return email if "@" in email else ""
+
+        recipients = []
+        for candidate in [
+            _clean_email(getattr(reserva, "correo", "")),
+            _clean_email(getattr(getattr(reserva, "usuario", None), "email", "")),
+        ]:
+            if candidate and candidate not in recipients:
+                recipients.append(candidate)
+
+        if not recipients:
+            return False
+
+        subject = f"Tu cotizacion ya esta lista - Reserva #{reserva.id:06d}"
+        html_body = render_to_string(
+            "core/email_cotizacion_lista.html",
+            {
+                "reserva": reserva,
+                "empresa": _empresa_config(),
+                "site_url": _site_url(request=None),
+                "checkout_url": f"{_site_url(request=None)}{reverse('checkout_reserva', args=[reserva.id])}",
+                "mis_reservas_url": f"{_site_url(request=None)}{reverse('mis_reservas')}",
+                "whatsapp_number": getattr(settings, "WHATSAPP_NUMBER", ""),
+            },
+        )
+
+        email_cliente = EmailMessage(
+            subject=subject,
+            body=html_body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=recipients,
+        )
+        email_cliente.content_subtype = "html"
+        email_cliente.send(fail_silently=True)
+        return True
+    except Exception:
+        logger.exception("No se pudo enviar correo de cotizacion lista para la reserva %s", reserva.id)
+        return False
+
+
 def _extract_customer_email(proveedor, payload):
     if not isinstance(payload, dict):
         return ""
@@ -3776,6 +3927,9 @@ def checkout_pago(request, reserva_id):
     if reserva.estado == "pagada":
         messages.success(request, "Pago confirmado. Tu reserva ya esta pagada.")
         return redirect(_post_pago_redirect_for_user(request.user, embed_mode=embed_mode))
+    if _es_reserva_interna(reserva) and (not reserva.total_pagar or reserva.total_pagar <= 0):
+        messages.info(request, "Aun no se ha asignado un valor a esta reserva. Te avisaremos cuando este lista para pago.")
+        return redirect("mis_reservas")
 
     context = {
         "reserva": reserva,
@@ -3802,9 +3956,12 @@ def create_lemonsqueezy_checkout(request, reserva_id):
     if _es_reserva_agencia(reserva):
         messages.error(request, "Las reservas de agencia no manejan checkout en linea.")
         return redirect("mis_reservas")
-    if reserva.estado not in ["pendiente", "bloqueada_por_agencia"]:
+    if reserva.estado not in ["pendiente", ESTADO_COTIZACION_PENDIENTE, "bloqueada_por_agencia"]:
         messages.warning(request, "Esta reserva ya no esta pendiente de pago.")
         return redirect("tours")
+    if not reserva.total_pagar or reserva.total_pagar <= 0:
+        messages.info(request, "Aun no se ha asignado un valor a esta reserva.")
+        return redirect("mis_reservas")
 
     store_id = getattr(settings, "LEMONSQUEEZY_STORE_ID", "")
     variant_id = reserva.salida.tour.lemonsqueezy_variant_id or getattr(settings, "LEMONSQUEEZY_VARIANT_ID", "")
@@ -3903,8 +4060,10 @@ def create_paypal_order(request, reserva_id):
         return JsonResponse({"error": "No autorizado para esta reserva."}, status=403)
     if _es_reserva_agencia(reserva):
         return JsonResponse({"error": "Las reservas de agencia no manejan pago en linea."}, status=400)
-    if reserva.estado not in ["pendiente", "bloqueada_por_agencia"]:
+    if reserva.estado not in ["pendiente", ESTADO_COTIZACION_PENDIENTE, "bloqueada_por_agencia"]:
         return JsonResponse({"error": "La reserva ya no esta pendiente de pago."}, status=400)
+    if not reserva.total_pagar or reserva.total_pagar <= 0:
+        return JsonResponse({"error": "Aun no se ha asignado un valor a esta reserva."}, status=400)
 
     currency = _currency()
     token = _paypal_access_token()

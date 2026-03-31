@@ -200,11 +200,19 @@
                                 {% endif %}
                             </td>
                             <td class="px-8 py-6 italic tour-nombre">{{ r.salida.tour.nombre }}</td>
-                            <td class="px-8 py-6 font-bold monto-total">${{ r.total_pagar }}</td>
+                            <td class="px-8 py-6 font-bold monto-total">
+                                {% if r.estado == "cotizacion_pendiente" and not r.total_pagar %}
+                                Por cotizar
+                                {% elif r.estado == "cotizacion_pendiente" and r.total_pagar <= 0 %}
+                                Por cotizar
+                                {% else %}
+                                ${{ r.total_pagar }}
+                                {% endif %}
+                            </td>
                             <td class="px-8 py-6 text-center">
                                 <span id="estado-{{ r.id }}"
-                                    class="estado-label px-3 py-1 rounded-lg text-xs font-bold {% if r.estado == 'cancelada' %}bg-red-100 text-red-700{% elif r.estado == 'pagada' or r.tiene_pago %}bg-green-100 text-green-700{% elif r.estado == 'bloqueada_por_agencia' %}bg-blue-100 text-blue-700{% else %}bg-yellow-100 text-yellow-700{% endif %}">
-                                    {% if r.estado == "pagada" or r.tiene_pago %}pagada{% elif r.estado == "bloqueada_por_agencia" %}bloqueada agencia{% else %}{{ r.estado }}{% endif %}
+                                    class="estado-label px-3 py-1 rounded-lg text-xs font-bold {% if r.estado == 'cancelada' %}bg-red-100 text-red-700{% elif r.estado == 'pagada' or r.tiene_pago %}bg-green-100 text-green-700{% elif r.estado == 'bloqueada_por_agencia' %}bg-blue-100 text-blue-700{% elif r.estado == 'cotizacion_pendiente' %}bg-amber-100 text-amber-700{% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                                    {% if r.estado == "pagada" or r.tiene_pago %}pagada{% elif r.estado == "bloqueada_por_agencia" %}bloqueada agencia{% elif r.estado == "cotizacion_pendiente" %}{% if r.total_pagar and r.total_pagar > 0 %}cotizacion lista{% else %}pendiente cotizacion{% endif %}{% else %}{{ r.estado }}{% endif %}
                                 </span>
                             </td>
                             <td class="px-8 py-6 text-center">
@@ -271,6 +279,36 @@
                                 <span class="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-xs font-bold">
                                     Gestionar en tab Agencia
                                 </span>
+                                {% elif r.estado == "cotizacion_pendiente" %}
+                                <div class="flex flex-col gap-2 min-w-[230px]">
+                                    <form method="post" action="{% url 'registrar_monto_reserva_interna' r.id %}" class="flex items-center gap-2 justify-center">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="tipo" value="general">
+                                        {% if request.GET.fecha %}<input type="hidden" name="fecha" value="{{ request.GET.fecha }}">{% endif %}
+                                        <input type="number" step="0.01" min="0.01" name="monto_pagado" value="{% if r.total_pagar and r.total_pagar > 0 %}{{ r.total_pagar }}{% endif %}"
+                                            class="w-28 border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold" placeholder="Monto">
+                                        <button type="submit"
+                                            class="bg-primary hover:bg-primary-dark text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+                                            {% if r.total_pagar and r.total_pagar > 0 %}Actualizar monto{% else %}Asignar monto{% endif %}
+                                        </button>
+                                    </form>
+                                    {% if r.total_pagar and r.total_pagar > 0 %}
+                                    <span class="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-lg text-xs font-bold">
+                                        Cliente listo para pagar
+                                    </span>
+                                    {% if r.whatsapp_url_cliente %}
+                                    <a href="{{ r.whatsapp_url_cliente }}" target="_blank" rel="noopener noreferrer"
+                                        class="inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs font-bold">
+                                        <i class="fa-brands fa-whatsapp"></i>
+                                        WhatsApp cliente
+                                    </a>
+                                    {% endif %}
+                                    {% else %}
+                                    <span class="bg-amber-50 text-amber-700 px-3 py-1 rounded-lg text-xs font-bold">
+                                        Esperando cotizacion
+                                    </span>
+                                    {% endif %}
+                                </div>
                                 {% elif r.estado == "pagada" or r.tiene_pago %}
                                 <div class="inline-flex items-center gap-2">
                                     <a href="{% url 'ver_ticket_pdf' r.id %}" target="_blank"
@@ -290,6 +328,7 @@
                                             class="border rounded px-2 py-1 text-xs bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary w-full">
                                             <option value="pendiente" {% if r.estado == "pendiente" %}selected{% endif %}>
                                                 Pendiente</option>
+                                            <option value="cotizacion_pendiente" {% if r.estado == "cotizacion_pendiente" %}selected{% endif %}>Cotizacion pendiente</option>
                                             <option value="bloqueada_por_agencia" {% if r.estado == "bloqueada_por_agencia" %}selected{% endif %}>Bloqueada
                                                 Agencia</option>
                                             <option value="pagada" {% if r.estado == "pagada" %}selected{% endif %}>Pagada

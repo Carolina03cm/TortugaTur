@@ -23,6 +23,7 @@ urlpatterns = [
     path("panel/reservas/<int:reserva_id>/solicitud-agencia/", views.gestionar_solicitud_agencia, name="gestionar_solicitud_agencia"),
     path("panel/reservas/<int:reserva_id>/registrar-pago-agencia/", views.registrar_pago_agencia, name="registrar_pago_agencia"),
     path("panel/reservas/<int:reserva_id>/registrar-monto-agencia/", views.registrar_monto_agencia, name="registrar_monto_agencia"),
+    path("panel/reservas/<int:reserva_id>/registrar-monto-interno/", views.registrar_monto_reserva_interna, name="registrar_monto_reserva_interna"),
     path("agencia/factura-mensual/pdf/", views.factura_agencia_mensual_pdf, name="factura_agencia_mensual_pdf"),
     path("panel/reservas/<int:reserva_id>/eliminar/", views.eliminar_reserva, name="eliminar_reserva"),
     path("panel/salidas/", views.admin_salidas, name="admin_salidas"),

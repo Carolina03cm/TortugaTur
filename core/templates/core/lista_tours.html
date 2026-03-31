@@ -40,11 +40,16 @@
                         <!-- prettier-ignore -->
                         <h3 class="text-3xl font-black text-slate-900 leading-none tracking-tighter uppercase">{{ tour.nombre }}</h3>
                         <div class="text-right">
+                            {% if tour.ocultar_precio %}
+                            <span class="text-sm font-black text-slate-900 uppercase tracking-[0.2em]">Tarifa interna</span>
+                            <p class="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em]">Valor no visible</p>
+                            {% else %}
                             <!-- prettier-ignore -->
                             <span class="text-3xl font-black text-primary">{{ currency_code }} {{ tour.precio_adulto_display|floatformat:2 }}</span>
                             <p class="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em]">Adulto</p>
                             <!-- prettier-ignore -->
                             <p class="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em]">Niño: {{ currency_code }} {{ tour.precio_nino_display|floatformat:2 }}</p>
+                            {% endif %}
                         </div>
                     </div>
 

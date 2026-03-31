@@ -9,7 +9,7 @@ class DestinoAdmin(admin.ModelAdmin):
 
 @admin.register(Tour)
 class TourAdmin(admin.ModelAdmin):
-    list_display = ("nombre", "destino", "precio", "lemonsqueezy_variant_id")
+    list_display = ("nombre", "destino", "precio", "ocultar_precio", "lemonsqueezy_variant_id")
 
 
 @admin.register(SalidaTour)

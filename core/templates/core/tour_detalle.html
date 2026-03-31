@@ -32,9 +32,14 @@
             <section>
                 <h2 class="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3">
                     <span class="w-8 h-1 bg-primary rounded-full"></span>
-                    Descripción del Recorrido
+                    Descripcion del Recorrido
                 </h2>
-                <p class="text-slate-600 text-lg leading-relaxed">{{ tour.descripcion }}</p>
+                <div class="space-y-4">
+                    <p class="text-slate-600 text-lg leading-relaxed">{{ tour.descripcion }}</p>
+                    {% if tour.descripcion_experiencia %}
+                    <div class="text-slate-600 text-base leading-8 whitespace-pre-line">{{ tour.descripcion_experiencia }}</div>
+                    {% endif %}
+                </div>
             </section>
 
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10 mt-6">
@@ -52,14 +57,81 @@
                 <div class="p-6 bg-white rounded-[2rem] border border-slate-100 shadow-sm text-center">
                     <span class="material-icons text-primary mb-3">g_translate</span>
                     <p class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Idiomas</p>
-                    <p class="font-bold text-slate-800">ESP / ENG</p>
+                    <p class="font-bold text-slate-800">{{ tour.idiomas|default:"ESP / ENG" }}</p>
                 </div>
                 <div class="p-6 bg-white rounded-[2rem] border border-slate-100 shadow-sm text-center">
                     <span class="material-icons text-primary mb-3">phishing</span>
                     <p class="text-[10px] font-black uppercase text-slate-400 tracking-widest">Dificultad</p>
-                    <p class="font-bold text-slate-800">Media</p>
+                    <p class="font-bold text-slate-800">{{ tour.nivel_dificultad|default:"Media" }}</p>
                 </div>
             </div>
+
+            {% if tour_incluye_items or tour_no_incluye_items %}
+            <section class="grid md:grid-cols-2 gap-6">
+                {% if tour_incluye_items %}
+                <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8">
+                    <h2 class="text-xl font-black text-slate-900 mb-5">Incluye</h2>
+                    <ul class="space-y-3 text-slate-600">
+                        {% for item in tour_incluye_items %}
+                        <li class="flex gap-3">
+                            <span class="material-icons text-primary text-lg">check_circle</span>
+                            <span>{{ item }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if tour_no_incluye_items %}
+                <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8">
+                    <h2 class="text-xl font-black text-slate-900 mb-5">No Incluye</h2>
+                    <ul class="space-y-3 text-slate-600">
+                        {% for item in tour_no_incluye_items %}
+                        <li class="flex gap-3">
+                            <span class="material-icons text-rose-500 text-lg">remove_circle</span>
+                            <span>{{ item }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </section>
+            {% endif %}
+
+            {% if tour_recomendaciones_items %}
+            <section class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8">
+                <h2 class="text-2xl font-black text-slate-900 mb-5">Recomendaciones</h2>
+                <ul class="space-y-3 text-slate-600">
+                    {% for item in tour_recomendaciones_items %}
+                    <li class="flex gap-3">
+                        <span class="material-icons text-amber-500 text-lg">tips_and_updates</span>
+                        <span>{{ item }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </section>
+            {% endif %}
+
+            {% if tour_info_importante_items %}
+            <section class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8">
+                <h2 class="text-2xl font-black text-slate-900 mb-5">Informacion Importante</h2>
+                <ul class="space-y-3 text-slate-600">
+                    {% for item in tour_info_importante_items %}
+                    <li class="flex gap-3">
+                        <span class="material-icons text-sky-500 text-lg">info</span>
+                        <span>{{ item }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </section>
+            {% endif %}
+
+            {% if tour.nota_importante %}
+            <section class="bg-amber-50 rounded-[2.5rem] border border-amber-100 shadow-sm p-8">
+                <h2 class="text-2xl font-black text-amber-900 mb-4">Nota Importante</h2>
+                <p class="text-amber-900 leading-8 whitespace-pre-line">{{ tour.nota_importante }}</p>
+            </section>
+            {% endif %}
 
             <section id="comentarios" class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 space-y-6">
                 <div>
@@ -346,7 +418,7 @@
                         </p>
                         {% endif %}
 
-                        {% if not user_is_agencia %}
+                        {% if not user_is_agencia and not tour_oculta_precio %}
                         <div class="bg-slate-900 rounded-[2rem] p-6 text-white shadow-xl relative mt-4">
                             <!-- Currency Selector Integrado (Sin Recarga) -->
                             <div
@@ -385,8 +457,16 @@
                         </div>
                         {% else %}
                         <div class="bg-blue-50 rounded-[2rem] p-6 text-blue-900 border border-blue-100 mt-4">
-                            <p class="text-[10px] uppercase tracking-widest font-black text-blue-500">Agencia</p>
-                            <p class="text-sm font-bold mt-1">Reserva sin precio. Solo indica pasajeros o usa charter de 16.</p>
+                            <p class="text-[10px] uppercase tracking-widest font-black text-blue-500">
+                                {% if user_is_agencia %}Agencia{% else %}Tarifa interna{% endif %}
+                            </p>
+                            <p class="text-sm font-bold mt-1">
+                                {% if user_is_agencia %}
+                                Reserva sin precio. Solo indica pasajeros o usa charter de 16.
+                                {% else %}
+                                Este tour no publica tarifa. Registra la reserva y el equipo coordinara el valor internamente.
+                                {% endif %}
+                            </p>
                         </div>
                         {% endif %}
 
@@ -407,8 +487,13 @@
                             <span class="material-icons text-4xl">lock</span>
                         </div>
                         <h3 class="text-2xl font-black text-slate-900 leading-tight">¡Casi listo!<br>Inicia sesión</h3>
-                        <p class="text-slate-500 text-sm">Para confirmar tu reserva de <b>$<span
-                                    id="resumenPrecioAuth"></span></b>, necesitamos identificarte.</p>
+                        <p class="text-slate-500 text-sm">
+                            {% if tour_oculta_precio %}
+                            Para registrar esta reserva, necesitamos identificarte.
+                            {% else %}
+                            Para confirmar tu reserva de <b>$<span id="resumenPrecioAuth"></span></b>, necesitamos identificarte.
+                            {% endif %}
+                        </p>
 
                         <div class="space-y-3 pt-4">
                             <a href="{% url 'login' %}?next={{ request.path }}"
@@ -525,6 +610,7 @@
     const usuarioLogueado = "{{ user.is_authenticated|yesno:'true,false' }}" === "true";
     const usuarioEsAgencia = "{{ user_is_agencia|yesno:'true,false' }}" === "true";
     const descuentoNinosActivo = "{{ aplica_descuento_ninos|yesno:'true,false' }}" === "true";
+    const tourOcultaPrecio = "{{ tour_oculta_precio|yesno:'true,false' }}" === "true";
 
     function actualizarHorariosAgencia() {
         recalcular();
@@ -586,6 +672,7 @@
 
     // Modulo de Cambio de Moneda en Vivo (AJAX SIMULADO)
     function cambiarMonedaEnVivo(monedaElegida) {
+        if (tourOcultaPrecio) return;
         if (!tasasCambio[monedaElegida]) return; // Si no hay tasa fallida
 
         let multiplier = parseFloat(tasasCambio[monedaElegida]) || 1.0;
@@ -734,7 +821,9 @@
         const totalPersonas = ad + ni;
         const totalDinero = (ad * precioAdulto) + precioNino;
 
-        document.getElementById('totalPagar').innerText = totalDinero.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (!tourOcultaPrecio) {
+            document.getElementById('totalPagar').innerText = totalDinero.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
         if (totalPersonas > 0) document.getElementById('error-msg').classList.add('hidden');
 
         // Modificar cuadros de Duración y Capacidad dinámicamente según la salida elegida
@@ -816,7 +905,9 @@
             document.getElementById('paso1').classList.add('hidden');
             document.getElementById('paso2').classList.remove('hidden');
         } else {
-            document.getElementById('resumenPrecioAuth').innerText = document.getElementById('totalPagar').innerText;
+            if (!tourOcultaPrecio) {
+                document.getElementById('resumenPrecioAuth').innerText = document.getElementById('totalPagar').innerText;
+            }
             document.getElementById('paso1').classList.add('hidden');
             document.getElementById('bloqueAuth').classList.remove('hidden');
         }
