@@ -1,17 +1,79 @@
 {% extends "core/base.html" %}
+{% load static %}
 
 {% block title %}Inicio | TortugaTur{% endblock %}
+{% block extra_css %}
+<style>
+  .tt-reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity .75s ease, transform .75s ease;
+  }
+
+  .tt-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .tt-lift {
+    transition: transform .35s ease, box-shadow .35s ease;
+  }
+
+  .tt-lift:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.14);
+  }
+
+  .tt-gallery-slide {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transform: scale(1.06);
+    transition: opacity .9s ease, transform 4.5s ease;
+  }
+
+  .tt-gallery-slide.is-active {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .tt-gallery-dot {
+    transition: transform .25s ease, background-color .25s ease;
+  }
+
+  .tt-gallery-dot.is-active {
+    transform: scale(1.15);
+    background-color: #007e37;
+  }
+
+  .tt-float {
+    animation: ttFloat 5.5s ease-in-out infinite;
+  }
+
+  .tt-pulse-shadow {
+    animation: ttPulse 2.8s ease-in-out infinite;
+  }
+
+  @keyframes ttFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  @keyframes ttPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(0, 126, 55, 0.28); }
+    50% { box-shadow: 0 0 0 10px rgba(0, 126, 55, 0); }
+  }
+</style>
+{% endblock %}
 
 {% block content %}
 
 <!-- HERO -->
 <section class="h-[55vh] flex items-center justify-center text-center text-white relative"
   style="background-image: url('https://img.goraymi.com/2018/01/08/c93f76a93b2dcb7adb1d4c1c95ed4228_xl.jpg'); background-size: cover; background-position: center;">
-  <!-- Overlay oscuro -->
   <div class="absolute inset-0 bg-black/50"></div>
 
-  <!-- Contenido -->
-  <div class="relative max-w-3xl px-6">
+  <div class="relative max-w-3xl px-6 tt-reveal">
     <h1 class="text-5xl md:text-6xl font-extrabold mb-6">
       Descubre la magia de <span class="text-primary">Galápagos</span>
     </h1>
@@ -19,7 +81,7 @@
       Reserva tours increíbles con guías locales certificados y vive una experiencia única.
     </p>
     <a href="#busqueda" onclick="document.getElementById('busqueda').scrollIntoView({behavior: 'smooth'})"
-      class="inline-flex items-center gap-2 bg-primary px-8 py-4 rounded-full font-black text-white hover:bg-white hover:text-primary border-2 border-primary transition-all duration-300 shadow-xl mt-4 uppercase tracking-wider text-sm">
+      class="tt-pulse-shadow inline-flex items-center gap-2 bg-primary px-8 py-4 rounded-full font-black text-white hover:bg-white hover:text-primary border-2 border-primary transition-all duration-300 shadow-xl mt-4 uppercase tracking-wider text-sm">
       <span class="material-icons">travel_explore</span>
       Encuentra tu Tour
     </a>
@@ -49,7 +111,6 @@
         class="w-full pl-12 pr-4 py-5 bg-transparent rounded-2xl outline-none font-medium text-slate-700 dark:text-slate-200"
         required>
       <script>
-        // Evitar que el usuario seleccione fechas anteriores a hoy en el buscador
         document.getElementById('search-date').min = new Date().toISOString().split("T")[0];
       </script>
     </div>
@@ -75,45 +136,131 @@
   </form>
 </section>
 
-<!-- porque elegirnos -->
+<!-- BIENVENIDA -->
+<section class="py-16 bg-background-light dark:bg-slate-900">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="tt-reveal grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-center">
+      <div class="bg-white dark:bg-surface-dark border border-slate-100 dark:border-slate-700 rounded-[2rem] p-8 md:p-10 shadow-xl shadow-slate-200/40 dark:shadow-none">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center border border-emerald-100">
+            <img src="{% static 'icon/logo.png' %}" alt="TortugaTur Logo" class="h-11 w-auto object-contain">
+          </div>
+          <div>
+            <span class="text-primary font-black uppercase tracking-[0.28em] text-[11px]">Bienvenidos</span>
+            <p class="text-sm font-bold text-slate-500 dark:text-slate-400">Operadora local en Isla Isabela</p>
+          </div>
+        </div>
+        <h2 class="mt-4 text-3xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
+          TortugaTur Galápagos Isabela
+        </h2>
+        <p class="mt-6 text-base md:text-lg leading-8 text-slate-600 dark:text-slate-300">
+          TortugaTur Galápagos Isabela es una empresa local de turismo ubicada en Puerto Villamil, en la isla
+          Isabela. Desde el año 2013, ofrecemos experiencias auténticas y significativas en contacto directo con la
+          naturaleza, guiadas por personas nacidas y criadas en Galápagos.
+        </p>
+        <p class="mt-4 text-base md:text-lg leading-8 text-slate-600 dark:text-slate-300">
+          Nuestros tours van más allá de una simple visita: buscamos que cada viajero comprenda realmente las islas,
+          se conecte con la naturaleza y viva Galápagos desde la mirada local.
+        </p>
+      </div>
+
+      <div class="tt-reveal tt-lift bg-primary-dark text-white rounded-[2rem] p-8 md:p-10 shadow-xl shadow-slate-200/40 dark:shadow-none">
+        <div class="w-16 h-16 rounded-3xl bg-white/10 flex items-center justify-center text-emerald-300">
+          <span class="material-icons text-4xl">travel_explore</span>
+        </div>
+        <h3 class="mt-6 text-2xl md:text-3xl font-black tracking-tight">
+          Una experiencia pensada para conectar con Isabela
+        </h3>
+        <p class="mt-5 text-base leading-8 text-slate-200">
+          Operamos con una mirada cercana, responsable y auténtica para que cada recorrido se sienta real, bien
+          acompañado y memorable.
+        </p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <span class="rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-emerald-200">Puerto Villamil</span>
+          <span class="rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-emerald-200">Desde 2013</span>
+          <span class="rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-emerald-200">Guías locales</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- POR QUE ELEGIRNOS -->
 <section class="py-12 bg-background-light dark:bg-slate-900">
   <h2 class="text-3xl font-bold mb-10 text-center text-slate-900 dark:text-white">¿Por qué elegirnos?</h2>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
 
-      <div
-        class="p-6 rounded-xl bg-white dark:bg-surface-dark border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
+      <div class="tt-reveal tt-lift p-6 rounded-xl bg-white dark:bg-surface-dark border border-slate-100 dark:border-slate-700 shadow-sm">
         <div class="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 text-primary">
           <span class="material-icons text-3xl">eco</span>
         </div>
         <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">100% Ecológico</h3>
-        <p class="text-slate-600 dark:text-slate-400">Priorizamos la sostenibilidad y la conservación en cada recorrido
-          que operamos.</p>
+        <p class="text-slate-600 dark:text-slate-400">Priorizamos la sostenibilidad y la conservación en cada recorrido que operamos.</p>
       </div>
 
-      <div
-        class="p-6 rounded-xl bg-white dark:bg-surface-dark border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
+      <div class="tt-reveal tt-lift p-6 rounded-xl bg-white dark:bg-surface-dark border border-slate-100 dark:border-slate-700 shadow-sm">
         <div class="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 text-primary">
           <span class="material-icons text-3xl">people</span>
         </div>
         <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Guías Locales Expertos</h3>
-        <p class="text-slate-600 dark:text-slate-400">Explore con naturalistas certificados nativos de las islas.</p>
+        <p class="text-slate-600 dark:text-slate-400">Explora con naturalistas certificados y una operación cercana al destino.</p>
       </div>
 
-      <div
-        class="p-6 rounded-xl bg-white dark:bg-surface-dark border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
+      <div class="tt-reveal tt-lift p-6 rounded-xl bg-white dark:bg-surface-dark border border-slate-100 dark:border-slate-700 shadow-sm">
         <div class="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 text-primary">
           <span class="material-icons text-3xl">verified_user</span>
         </div>
         <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Seguros y Certificados</h3>
-        <p class="text-slate-600 dark:text-slate-400">Operadores debidamente autorizados que garantizan su seguridad y
-          comodidad en todo momento.</p>
+        <p class="text-slate-600 dark:text-slate-400">Operadores debidamente autorizados que garantizan su seguridad y comodidad en todo momento.</p>
       </div>
 
     </div>
   </div>
 </section>
 
+<!-- GALERIA HOME -->
+<section class="py-20 bg-white dark:bg-slate-900">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="tt-reveal text-center mb-10">
+      <span class="text-primary font-black uppercase tracking-[0.28em] text-[11px]">Galería</span>
+      <h2 class="text-3xl md:text-5xl font-black text-slate-900 dark:text-white mt-4 tracking-tight">
+        Instantes reales de TortugaTur
+      </h2>
+      <p class="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto mt-4 text-lg">
+        Una selección visual de experiencias vividas en Galápagos que cambia automáticamente.
+      </p>
+    </div>
+
+    <div class="tt-reveal tt-lift tt-float rounded-[2rem] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xl shadow-slate-200/40 dark:shadow-none p-3">
+      <div class="relative h-[260px] md:h-[420px] overflow-hidden rounded-[1.5rem] bg-slate-100 dark:bg-slate-800" id="home-gallery-rotator">
+        {% for foto in fotos_galeria_home %}
+        <div class="tt-gallery-slide {% if forloop.first %}is-active{% endif %}">
+          {% if foto.imagen_home_url %}
+          <img src="{{ foto.imagen_home_url }}" alt="Galería TortugaTur {{ forloop.counter }}" class="h-full w-full object-cover">
+          {% else %}
+          <div class="h-full w-full bg-slate-200 dark:bg-slate-700"></div>
+          {% endif %}
+        </div>
+        {% empty %}
+        <div class="tt-gallery-slide is-active">
+          <div class="h-full w-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400">
+            Sin imágenes en galería
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="mt-5 flex items-center justify-center gap-3" id="home-gallery-dots">
+        {% for foto in fotos_galeria_home %}
+        <button type="button" class="tt-gallery-dot {% if forloop.first %}is-active{% endif %} h-3 w-3 rounded-full bg-slate-300 dark:bg-slate-600" aria-label="Ir a imagen {{ forloop.counter }}"></button>
+        {% empty %}
+        <span class="h-3 w-3 rounded-full bg-slate-300 dark:bg-slate-600"></span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- TOURS DESTACADOS -->
 <section class="max-w-7xl mx-auto px-6 py-20">
@@ -124,29 +271,23 @@
 
   <div class="grid md:grid-cols-3 gap-8">
     {% for tour in tours_destacados %}
-    <div
-      class="bg-white dark:bg-slate-800 rounded-xl shadow hover:shadow-lg transition overflow-hidden border border-transparent dark:border-slate-700">
-
-      <!-- Imagen del destino -->
+    <div class="tt-reveal tt-lift bg-white dark:bg-slate-800 rounded-xl shadow hover:shadow-lg transition overflow-hidden border border-transparent dark:border-slate-700">
       <div class="h-48 w-full overflow-hidden">
         {% if tour.destino.imagen_url %}
         <img src="{{ tour.destino.imagen_url }}" alt="{{ tour.destino.nombre }}" class="w-full h-full object-cover">
         {% else %}
-        <div
-          class="h-48 flex items-center justify-center bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+        <div class="h-48 flex items-center justify-center bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
           Sin imagen
         </div>
         {% endif %}
       </div>
 
-      <!-- Contenido -->
       <div class="p-6">
         <h3 class="font-bold text-xl mb-2 text-slate-900 dark:text-white">{{ tour.nombre }}</h3>
         <p class="text-slate-600 dark:text-slate-400 text-sm mb-4">
           {{ tour.descripcion|truncatechars:100 }}
         </p>
-        <div
-          class="flex items-center gap-2 mb-4 text-xs font-bold text-slate-500 bg-slate-50 dark:bg-slate-700/50 p-2 rounded-lg w-fit">
+        <div class="flex items-center gap-2 mb-4 text-xs font-bold text-slate-500 bg-slate-50 dark:bg-slate-700/50 p-2 rounded-lg w-fit">
           <span class="material-icons text-sm text-primary">timer</span>
           {{ tour.duracion|default:"Medio día" }}
         </div>
@@ -171,12 +312,10 @@
   <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
     <span class="material-icons text-6xl text-primary/20 mb-6">format_quote</span>
     <h2 class="text-3xl md:text-5xl font-bold text-slate-800 dark:text-white mb-8 leading-tight">
-      "Un sueño hecho realidad. TortugaTur se encargó de todo a la perfección, permitiéndonos centrarnos en la
-      impresionante vida silvestre."
+      "Un sueño hecho realidad. TortugaTur se encargó de todo a la perfección, permitiéndonos centrarnos en la impresionante vida silvestre."
     </h2>
     <div class="flex items-center justify-center gap-4">
       <img alt="Retrato de una viajera sonriente" class="w-16 h-16 rounded-full object-cover border-2 border-primary"
-        data-alt="Portrait of a smiling woman traveler"
         src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvBOeLKFhoXh4KbNUxP5ynaXF_v3PRL4xEgf--yc3Ek4pIqXtibf1U8InY2JaQ2RimGKhRXIbsewRjTUDbq35Mw_uC8q1PAbqN1gEZipQ4QGtfLNOzSfdPoc4BCu6zuRwseDl6aZnyuNirxPKU2htAa2U9iWZ63mGJO_d68gh7LI_AWGv9BMI9lqbibLHuw_DQi4HTr4LQ_MK8UQ8VXAL18uxCeeOK-L0EzA5zUxr5xRWPOHF02t0GYPIgKjA-hTkf1Wtww6mY3tIv" />
       <div class="text-left">
         <div class="font-bold text-slate-900 dark:text-white">Andrea Contreras</div>
@@ -190,18 +329,15 @@
 <section class="py-24 relative overflow-hidden">
   <div class="absolute inset-0 bg-slate-900">
     <img alt="Vista aérea de la costa con agua turquesa" class="w-full h-full object-cover opacity-40"
-      data-alt="Aerial view of coastline with turquoise water"
       src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQ3oz5-Yf4kuq08KMFcdM6_IkaeH5X7gf_Yg5JgF53gLUL1kDF8coQsLrpVKxfHrNZ9F9hOBqC26nCienzYbP4sGAFWk0ub_vBOJTiDcb41hFz-dA4rxQ75Pf9wG-Zn6JxRcjhHYSxF0bYUclLO_2Yp0WooFTfaZ5cO0MffcMzRZFprYraoBkPGfeO1mseq7L3FmNWDfOTLJJqs6IDK1CCsEr2vPak-uJwC27d_Kn5M4-DmahgA7V4lG471eJJ1r5ssFatvzmOTt5M" />
   </div>
   <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
     <h2 class="text-4xl md:text-5xl font-bold text-white mb-6">¿Listo para tu aventura?</h2>
-    <p class="text-xl text-slate-200 mb-10 max-w-2xl mx-auto">Reserva hoy tu experiencia en Galápagos y crea recuerdos
-      para toda la vida.</p>
+    <p class="text-xl text-slate-200 mb-10 max-w-2xl mx-auto">Reserva hoy tu experiencia en Galápagos y crea recuerdos para toda la vida.</p>
     <div class="flex flex-col sm:flex-row gap-4 justify-center">
       <a href="{% url 'lista_tours' %}"
         class="bg-primary hover:bg-white hover:text-primary border-2 border-primary text-white font-black py-4 px-10 rounded-full transition-all duration-300 shadow-xl shadow-primary/30 uppercase tracking-widest text-sm flex items-center justify-center gap-2 group">
-        <span
-          class="material-icons group-hover:-translate-y-1 group-hover:translate-x-1 transition-transform">explore</span>
+        <span class="material-icons group-hover:-translate-y-1 group-hover:translate-x-1 transition-transform">explore</span>
         Explorar todos los destinos
       </a>
       <a href="{% url 'contacto' %}"
@@ -212,5 +348,59 @@
     </div>
   </div>
 </section>
+
+<!-- MAPA -->
+<section id="mapa-ubicacion" class="py-20 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="tt-reveal text-center mb-10">
+      <span class="text-primary font-black uppercase tracking-[0.28em] text-[11px]">Ubicación</span>
+      <h2 class="text-3xl md:text-5xl font-black text-slate-900 dark:text-white mt-4 tracking-tight">Encuéntranos en Isla Isabela</h2>
+      <p class="text-slate-500 dark:text-slate-400 max-w-2xl mx-auto mt-4 text-lg">
+        Visítanos en Puerto Villamil y planifica tu aventura directamente con TortugaTur.
+      </p>
+    </div>
+    <div class="tt-reveal tt-lift tt-float overflow-hidden rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-2xl shadow-slate-200/40 dark:shadow-none bg-white dark:bg-slate-800 p-3">
+      <iframe
+        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1994.6308474335542!2d-90.96717156169039!3d-0.9570787179207461!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x9aabeb90833ae46f%3A0x1720d4f9b50cb7ad!2sOperadora%20de%20Turismo%20Tortuga%20Tur%20C.L.!5e0!3m2!1ses!2sec!4v1774977440255!5m2!1ses!2sec"
+        width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"
+        class="h-[320px] md:h-[420px] w-full rounded-[1.3rem]"></iframe>
+    </div>
+  </div>
+</section>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const items = document.querySelectorAll('.tt-reveal');
+    if (items.length) {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.14, rootMargin: '0px 0px -40px 0px' });
+
+      items.forEach((item, index) => {
+        item.style.transitionDelay = `${Math.min(index * 45, 220)}ms`;
+        observer.observe(item);
+      });
+    }
+
+    const slides = document.querySelectorAll('#home-gallery-rotator .tt-gallery-slide');
+    const dots = document.querySelectorAll('#home-gallery-dots .tt-gallery-dot');
+    if (slides.length > 1) {
+      let index = 0;
+      setInterval(() => {
+        slides[index].classList.remove('is-active');
+        if (dots[index]) dots[index].classList.remove('is-active');
+        index = (index + 1) % slides.length;
+        slides[index].classList.add('is-active');
+        if (dots[index]) dots[index].classList.add('is-active');
+      }, 3500);
+    }
+  });
+</script>
 
 {% endblock %}

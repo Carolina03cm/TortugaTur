@@ -184,6 +184,9 @@ def _secretaria_actividad_dia(user, fecha):
 def home(request):
     destinos = Destino.objects.all()
     tours_destacados = _filtrar_tours_para_usuario(Tour.objects.all(), request.user)[:3]
+    fotos_galeria_home = list(Galeria.objects.order_by("-fecha_agregada")[:3])
+    for foto in fotos_galeria_home:
+        foto.imagen_home_url = foto.obtener_imagen_url()
     currency_code, currency_rate = _currency_context(request)
     visitas_home_total = SiteVisit.objects.count()
     for tour in tours_destacados:
@@ -198,6 +201,7 @@ def home(request):
     context = {
         "destinos": destinos,
         "tours_destacados": tours_destacados,
+        "fotos_galeria_home": fotos_galeria_home,
         "visitas_home_total": visitas_home_total,
         "currency_code": currency_code,
         "currency_options": list(getattr(settings, "CURRENCY_RATES", {}).keys()),

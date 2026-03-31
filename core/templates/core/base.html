@@ -344,7 +344,7 @@
     </main>
 
     {% if '/panel/' not in request.path and '/checkout/' not in request.path and request.GET.embed != '1' %}
-    <a href="https://wa.me/5930939833971" target="_blank" id="whatsapp-btn-dynamic"
+    <a href="https://wa.me/593981998839" target="_blank" id="whatsapp-btn-dynamic"
         class="fixed bottom-8 right-8 z-[60] flex items-center justify-center w-16 h-16 bg-[#25D366] text-white rounded-full shadow-2xl hover:scale-110 transition-all group">
         <i class="fa-brands fa-whatsapp text-3xl"></i>
         <span
@@ -360,7 +360,7 @@
             if (btn) {
                 const urlActual = window.location.href;
                 const mensajePersonalizado = `¡Hola TortugaTur! Me gustaría recibir asesoría súper rápida para planificar mi aventura en Galápagos.\n\nEstaba explorando esta sección de su web: ${urlActual}`;
-                btn.href = `https://wa.me/5930939833971?text=${encodeURIComponent(mensajePersonalizado)}`;
+                btn.href = `https://wa.me/593981998839?text=${encodeURIComponent(mensajePersonalizado)}`;
             }
         });
     </script>
@@ -381,10 +381,10 @@
                     de viaje.
                 </p>
                 <div class="flex gap-4">
-                    <a href="#"
+                    <a href="https://www.instagram.com/operadoratortugatur?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" target="_blank" rel="noopener noreferrer"
                         class="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-primary transition"><i
                             class="fa-brands fa-instagram"></i></a>
-                    <a href="#"
+                    <a href="https://www.facebook.com/share/1E2tR9RvBd/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer"
                         class="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-primary transition"><i
                             class="fa-brands fa-facebook-f"></i></a>
                 </div>
@@ -410,16 +410,28 @@
 
             <div>
                 <h4 class="text-white font-bold uppercase text-[11px] tracking-[0.2em] mb-6">Contacto</h4>
-                <p class="text-sm text-slate-400 leading-relaxed">
-                    Puerto Ayora, Isla Santa Cruz<br>
-                    Galápagos, Ecuador<br>
-                    info@tortugatour.com
-                </p>
+                <div class="space-y-4 text-sm text-slate-400">
+                    <div class="flex items-start gap-3">
+                        <span class="material-icons text-primary text-lg mt-0.5">location_on</span>
+                        <p class="leading-relaxed">
+                            Isla Isabela / Puerto Villamil<br>
+                            Galápagos, Ecuador
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="material-icons text-primary text-lg">alternate_email</span>
+                        <a href="mailto:tortugaturec@gmail.com" class="hover:text-primary transition">tortugaturec@gmail.com</a>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <i class="fa-brands fa-whatsapp text-primary text-lg"></i>
+                        <a href="https://wa.me/593981998839" target="_blank" rel="noopener noreferrer" class="hover:text-primary transition">+593981998839</a>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div class="border-t border-white/5 py-8 text-center text-xs text-slate-500 uppercase tracking-widest">
-            &copy; 2026 TortugaTur. Todos los derechos reservados.
+            &copy; {% now "Y" %} TortugaTur. Todos los derechos reservados.
         </div>
     </footer>
     {% endif %}

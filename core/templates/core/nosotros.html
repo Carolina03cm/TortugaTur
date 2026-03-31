@@ -1,77 +1,553 @@
 {% extends "core/base.html" %}
+{% block title %}Nosotros | TortugaTur Galapagos Isabela{% endblock %}
+{% block extra_css %}
+<style>
+    .tt-about {
+        --tt-ink: #0f172a;
+        --tt-line: rgba(15, 23, 42, 0.08);
+        --tt-shadow: 0 20px 50px rgba(15, 23, 42, 0.10);
+    }
+
+    .tt-reveal {
+        opacity: 0;
+        transform: translateY(24px);
+        transition: opacity .7s ease, transform .7s ease;
+    }
+
+    .tt-reveal.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .tt-card {
+        box-shadow: var(--tt-shadow);
+    }
+
+    .tt-lift {
+        transition: transform .3s ease, box-shadow .3s ease;
+    }
+
+    .tt-lift:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 26px 60px rgba(15, 23, 42, 0.14);
+    }
+
+    .tt-image img {
+        transition: transform .9s ease;
+    }
+
+    .tt-image:hover img {
+        transform: scale(1.04);
+    }
+</style>
+{% endblock %}
 {% block content %}
 
-<div class="relative py-20 bg-slate-900 overflow-hidden">
-    <div class="absolute inset-0 opacity-20">
-        <img src="https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070" class="w-full h-full object-cover" alt="Fondo">
-    </div>
-    <div class="relative max-w-7xl mx-auto px-6 text-center">
-        <span class="text-primary font-black uppercase tracking-[0.3em] text-xs">Descubre nuestra historia</span>
-        <h1 class="text-5xl md:text-7xl font-black text-white mt-4 mb-6 tracking-tighter uppercase leading-none">
-            Pasión por la <br><span class="text-primary">Aventura</span>
-        </h1>
-        <p class="text-slate-300 max-w-2xl mx-auto text-lg font-medium">
-            En TortugaTur, no solo vendemos destinos, creamos experiencias memorables conectando a viajeros con la naturaleza y la cultura local.
-        </p>
-    </div>
+<div class="tt-about bg-background-light text-slate-800">
+    <section class="relative overflow-hidden bg-slate-950 pt-28 pb-20 md:pt-32">
+        <div class="absolute inset-0">
+            <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Collage%20Puerto%20Villamil.png"
+                alt="Isabela Galapagos" class="h-full w-full object-cover opacity-50">
+        </div>
+        <div class="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900/85 to-primary-dark/75"></div>
+
+        <div class="relative mx-auto grid max-w-7xl gap-10 px-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
+            <div class="tt-reveal max-w-4xl">
+                <p class="text-xs font-black uppercase tracking-[0.3em] text-emerald-300">TortugaTur Galapagos Isabela</p>
+                <h1 class="mt-4 text-5xl font-black uppercase tracking-tight text-white md:text-7xl">
+                    Vive Isabela desde una mirada local y autentica
+                </h1>
+                <p class="mt-6 max-w-3xl text-base leading-8 text-slate-200 md:text-lg">
+                    Empresa local de turismo ubicada en Puerto Villamil, isla Isabela. Desde 2013 ofrecemos
+                    experiencias autenticas y significativas en contacto directo con la naturaleza, guiadas por
+                    personas nacidas y criadas en Galapagos.
+                </p>
+                <p class="mt-4 max-w-3xl text-base leading-8 text-slate-300">
+                    Nuestros tours van mas alla de una simple visita: buscamos que cada viajero comprenda realmente
+                    las islas, se conecte con la naturaleza y viva Galapagos desde la mirada local.
+                </p>
+                <div class="mt-8 flex flex-col gap-4 sm:flex-row">
+                    <a href="{% url 'tours' %}"
+                        class="inline-flex items-center justify-center rounded-full bg-primary px-8 py-4 text-xs font-black uppercase tracking-[0.24em] text-white transition hover:bg-primary-dark">
+                        Ver tours
+                    </a>
+                    <a href="{% url 'contacto' %}"
+                        class="inline-flex items-center justify-center rounded-full border border-white/20 bg-white/10 px-8 py-4 text-xs font-black uppercase tracking-[0.24em] text-white transition hover:bg-white hover:text-slate-900">
+                        Solicitar informacion
+                    </a>
+                </div>
+            </div>
+
+            <div class="tt-reveal">
+                <div class="tt-card overflow-hidden rounded-[2rem] border border-white/10 bg-white/10 p-4 backdrop-blur">
+                    <div class="tt-image relative overflow-hidden rounded-[1.5rem]">
+                        <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Puerto%20Villamil.jpg"
+                            alt="Puerto Villamil e Isabela" class="h-[420px] w-full object-cover">
+                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
+                        <div class="absolute left-6 top-6 rounded-full bg-emerald-300/15 px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-emerald-200">
+                            Puerto Villamil
+                        </div>
+                        <div class="absolute inset-x-6 bottom-6">
+                            <p class="text-4xl font-black leading-none text-white md:text-5xl">
+                                Naturaleza, mar y experiencia real
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="py-20">
+        <div class="mx-auto max-w-7xl px-6">
+            <div class="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-start">
+                <div class="tt-reveal tt-card rounded-[2rem] border border-slate-200 bg-white p-8 md:p-10">
+                    <p class="text-xs font-black uppercase tracking-[0.3em] text-primary">Descripcion de la empresa</p>
+                    <h2 class="mt-4 text-4xl font-black uppercase tracking-tight text-slate-900 md:text-5xl">
+                        Turismo local en Isabela con enfoque humano y sostenible
+                    </h2>
+                    <p class="mt-6 text-base leading-8 text-slate-600">
+                        TortugaTur Galapagos Isabela es una empresa local de turismo ubicada en Puerto Villamil, en la
+                        isla Isabela. Desde el ano 2013, ofrecemos experiencias autenticas y significativas en contacto
+                        directo con la naturaleza, guiadas por personas nacidas y criadas en Galapagos.
+                    </p>
+                    <p class="mt-4 text-base leading-8 text-slate-600">
+                        Nuestros tours van mas alla de una simple visita. Buscamos que cada viajero comprenda
+                        realmente las islas, se conecte con la naturaleza y viva Galapagos desde la mirada local.
+                    </p>
+                </div>
+
+                <div class="tt-reveal tt-image tt-card overflow-hidden rounded-[2rem] border border-slate-200 bg-white">
+                    <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Puerto%20Villamil.jpg"
+                        alt="Puerto Villamil isla Isabela" class="h-[420px] w-full object-cover">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="pb-20">
+        <div class="mx-auto max-w-7xl px-6">
+            <div class="grid overflow-hidden rounded-[2.2rem] border border-slate-200 bg-white tt-card lg:grid-cols-2">
+                <article class="tt-reveal p-8 md:p-12">
+                    <div class="mb-8 flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 text-primary">
+                        <span class="material-icons text-4xl">explore</span>
+                    </div>
+                    <p class="text-xs font-black uppercase tracking-[0.3em] text-primary">Mision</p>
+                    <h2 class="mt-4 text-3xl font-black uppercase tracking-tight text-slate-900 md:text-4xl">
+                        Experiencias educativas e inmersivas
+                    </h2>
+                    <p class="mt-6 text-base leading-8 text-slate-600">
+                        Brindar experiencias educativas e inmersivas que conecten a los visitantes con los ecosistemas
+                        unicos de Galapagos, promoviendo el respeto, la conservacion y el turismo responsable.
+                    </p>
+                    <p class="mt-4 text-base leading-8 text-slate-600">
+                        Buscamos inspirar a cada viajero a valorar y proteger este entorno fragil.
+                    </p>
+                </article>
+
+                <article class="tt-reveal bg-primary-dark p-8 text-white md:p-12">
+                    <div class="mb-8 flex h-16 w-16 items-center justify-center rounded-3xl bg-white/10 text-emerald-300">
+                        <span class="material-icons text-4xl">visibility</span>
+                    </div>
+                    <p class="text-xs font-black uppercase tracking-[0.3em] text-emerald-300">Vision</p>
+                    <h2 class="mt-4 text-3xl font-black uppercase tracking-tight md:text-4xl">
+                        Ser un referente en turismo sostenible en Galapagos
+                    </h2>
+                    <p class="mt-6 text-base leading-8 text-slate-200">
+                        Ser un referente en turismo sostenible en Galapagos, reconocidos por nuestra autenticidad,
+                        compromiso ambiental y la calidad de nuestras experiencias educativas.
+                    </p>
+                    <p class="mt-4 text-base leading-8 text-slate-200">
+                        Aspiramos a generar una conciencia profunda en cada visitante, convirtiendo cada experiencia
+                        en una conexion duradera con la naturaleza.
+                    </p>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <section class="pb-20">
+        <div class="mx-auto max-w-7xl px-6">
+            <div class="tt-reveal text-center">
+                <p class="text-xs font-black uppercase tracking-[0.3em] text-primary">Valores</p>
+                <h2 class="mt-4 text-4xl font-black uppercase tracking-tight text-slate-900 md:text-5xl">
+                    La forma en que operamos en las islas
+                </h2>
+            </div>
+
+            <div class="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+                <article class="tt-reveal tt-lift rounded-[1.8rem] border border-slate-200 bg-white p-6">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-primary">
+                        <span class="material-icons text-3xl">eco</span>
+                    </div>
+                    <h3 class="mt-5 text-xl font-black text-slate-900">Respeto por la naturaleza</h3>
+                    <p class="mt-3 text-sm leading-7 text-slate-600">Seguimos y promovemos las normas naturales del ecosistema.</p>
+                </article>
+                <article class="tt-reveal tt-lift rounded-[1.8rem] border border-slate-200 bg-white p-6">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-primary">
+                        <span class="material-icons text-3xl">public</span>
+                    </div>
+                    <h3 class="mt-5 text-xl font-black text-slate-900">Responsabilidad ambiental</h3>
+                    <p class="mt-3 text-sm leading-7 text-slate-600">Entendemos lo fragiles que son las islas y actuamos en consecuencia.</p>
+                </article>
+                <article class="tt-reveal tt-lift rounded-[1.8rem] border border-slate-200 bg-white p-6">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-primary">
+                        <span class="material-icons text-3xl">school</span>
+                    </div>
+                    <h3 class="mt-5 text-xl font-black text-slate-900">Educacion</h3>
+                    <p class="mt-3 text-sm leading-7 text-slate-600">Creemos que el conocimiento genera conexion y conservacion.</p>
+                </article>
+                <article class="tt-reveal tt-lift rounded-[1.8rem] border border-slate-200 bg-white p-6">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-primary">
+                        <span class="material-icons text-3xl">diversity_3</span>
+                    </div>
+                    <h3 class="mt-5 text-xl font-black text-slate-900">Autenticidad</h3>
+                    <p class="mt-3 text-sm leading-7 text-slate-600">Compartimos experiencias reales y locales.</p>
+                </article>
+                <article class="tt-reveal tt-lift rounded-[1.8rem] border border-slate-200 bg-white p-6">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-primary">
+                        <span class="material-icons text-3xl">verified</span>
+                    </div>
+                    <h3 class="mt-5 text-xl font-black text-slate-900">Compromiso</h3>
+                    <p class="mt-3 text-sm leading-7 text-slate-600">Pasion por lo que hacemos y dedicacion a cada visitante.</p>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <section class="pb-20">
+        <div class="mx-auto max-w-7xl px-6">
+            <div class="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+                <div class="tt-reveal tt-card rounded-[2rem] border border-slate-200 bg-white p-8 md:p-10">
+                    <p class="text-xs font-black uppercase tracking-[0.3em] text-primary">Nuestra historia</p>
+                    <h2 class="mt-4 text-4xl font-black uppercase tracking-tight text-slate-900 md:text-5xl">
+                        De pescadores locales a una alternativa sostenible
+                    </h2>
+                    <p class="mt-6 text-base leading-8 text-slate-600">
+                        TortugaTur Galapagos Isabela nace en el ano 2013, cuando dos pescadores locales tuvieron la
+                        oportunidad de participar en un concurso y ganar una patente turistica. Este cambio les
+                        permitio dejar la pesca y formar parte de una actividad mas sostenible, contribuyendo al
+                        control de la actividad pesquera en las islas.
+                    </p>
+                    <p class="mt-4 text-base leading-8 text-slate-600">
+                        Desde entonces, la empresa ha crecido enfrentando desafios con actitud positiva y un fuerte
+                        compromiso con el medio ambiente. Hoy en dia, sus fundadores comparten no solo la belleza de
+                        Galapagos, sino tambien sus vivencias en el mar, brindando a los turistas una experiencia
+                        autentica y unica.
+                    </p>
+                </div>
+
+                <div class="tt-reveal tt-image tt-card overflow-hidden rounded-[2rem] border border-slate-200 bg-white">
+                    <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Collage%20Puerto%20Villamil.png"
+                        alt="Historia y mar en Isabela" class="h-[430px] w-full object-cover">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="pb-20">
+        <div class="mx-auto max-w-7xl px-6">
+            <div class="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+                <div class="tt-reveal">
+                    <p class="text-xs font-black uppercase tracking-[0.3em] text-primary">Que ofrecemos</p>
+                    <h2 class="mt-4 text-4xl font-black uppercase tracking-tight text-slate-900 md:text-5xl">
+                        Experiencias disenadas para conectar con la naturaleza de Galapagos
+                    </h2>
+                    <p class="mt-6 text-base leading-8 text-slate-600">
+                        Ofrecemos experiencias disenadas para conectar a nuestros visitantes con la naturaleza de
+                        Galapagos de una manera autentica, educativa y responsable.
+                    </p>
+                </div>
+
+                <div class="grid gap-5 md:grid-cols-2">
+                    <article class="tt-reveal tt-lift rounded-[1.8rem] border border-slate-200 bg-white p-6">
+                        <div class="tt-image overflow-hidden rounded-2xl">
+                            <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Puerto%20Villamil.jpg"
+                                alt="Tours privados" class="h-40 w-full object-cover">
+                        </div>
+                        <h3 class="mt-5 text-lg font-black uppercase tracking-tight text-slate-900">Tours guiados privados</h3>
+                    </article>
+                    <article class="tt-reveal tt-lift rounded-[1.8rem] bg-primary-dark p-6 text-white">
+                        <div class="tt-image overflow-hidden rounded-2xl">
+                            <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Collage%20Puerto%20Villamil.png"
+                                alt="Grupos compartidos" class="h-40 w-full object-cover">
+                        </div>
+                        <h3 class="mt-5 text-lg font-black uppercase tracking-tight">Experiencias en grupos compartidos</h3>
+                    </article>
+                    <article class="tt-reveal tt-lift rounded-[1.8rem] border border-emerald-100 bg-emerald-50 p-6">
+                        <div class="tt-image overflow-hidden rounded-2xl">
+                            <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Gal%C3%A1pagos%20sea%20lions%20Isabela.jpg"
+                                alt="Tours educativos" class="h-40 w-full object-cover">
+                        </div>
+                        <h3 class="mt-5 text-lg font-black uppercase tracking-tight text-slate-900">Tours educativos en contacto con la naturaleza</h3>
+                    </article>
+                    <article class="tt-reveal tt-lift rounded-[1.8rem] border border-slate-200 bg-white p-6">
+                        <div class="tt-image overflow-hidden rounded-2xl">
+                            <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Gal%C3%A1pagos%20sea%20lions%20Isabela.jpg"
+                                alt="Fauna de Galapagos" class="h-40 w-full object-cover">
+                        </div>
+                        <h3 class="mt-5 text-lg font-black uppercase tracking-tight text-slate-900">Encuentros cercanos con la fauna de Galapagos</h3>
+                    </article>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="bg-slate-900 py-20 text-white">
+        <div class="mx-auto max-w-7xl px-6">
+            <div class="tt-reveal max-w-3xl">
+                <p class="text-xs font-black uppercase tracking-[0.3em] text-emerald-300">Nuestros tours en Isabela</p>
+                <h2 class="mt-4 text-4xl font-black uppercase tracking-tight md:text-5xl">
+                    Experiencias unicas disponibles en la isla
+                </h2>
+                <p class="mt-6 text-base leading-8 text-slate-200">
+                    En TortugaTur Galapagos Isabela ponemos a tu disposicion una variedad de experiencias unicas en la
+                    isla Isabela.
+                </p>
+            </div>
+
+            <div class="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                <article class="tt-reveal tt-lift overflow-hidden rounded-[2rem] border border-white/10 bg-white/5">
+                    <div class="tt-image overflow-hidden">
+                        <img src="https://dynamic-media-cdn.tripadvisor.com/media/photo-o/0c/18/1f/db/photo0jpg.jpg?w=1200&h=1200&s=1"
+                            alt="Tour de Bahia Las Tintoreras" class="h-56 w-full object-cover">
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-2xl font-black text-white">Tour de Bahia - Snorkelling Las Tintoreras</h3>
+                    </div>
+                </article>
+                <article class="tt-reveal tt-lift overflow-hidden rounded-[2rem] border border-white/10 bg-white/5">
+                    <div class="tt-image overflow-hidden">
+                        <img src="https://agora-tours.com/wp-content/uploads/2022/12/Sierra-Negra-e1715814356263-1024x683.jpg"
+                            alt="Sierra Negra Volcan Chico" class="h-56 w-full object-cover">
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-2xl font-black text-white">Hike al Volcan Sierra Negra - Volcan Chico</h3>
+                    </div>
+                </article>
+                <article class="tt-reveal tt-lift overflow-hidden rounded-[2rem] border border-white/10 bg-white/5">
+                    <div class="tt-image overflow-hidden">
+                        <img src="https://www.civitatis.com/f/ecuador/isla-isabela/tour-minas-azufre-isla-isabela-grid.jpg"
+                            alt="Sierra Negra Minas de Azufre" class="h-56 w-full object-cover">
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-2xl font-black text-white">Hike al Volcan Sierra Negra - Minas de Azufre</h3>
+                    </div>
+                </article>
+                <article class="tt-reveal tt-lift overflow-hidden rounded-[2rem] border border-white/10 bg-white/5">
+                    <div class="tt-image overflow-hidden">
+                        <img src="https://opuntiahotels.com/wp-content/uploads/2025/07/lostuneles.webp"
+                            alt="Los Tuneles" class="h-56 w-full object-cover">
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-2xl font-black text-white">Tour de Snorkelling Los Tuneles</h3>
+                    </div>
+                </article>
+                <article class="tt-reveal tt-lift overflow-hidden rounded-[2rem] border border-white/10 bg-white/5">
+                    <div class="tt-image overflow-hidden">
+                        <img src="https://a.files.bbci.co.uk/worldservice/live/assets/images/2013/11/18/131118203518_muro_lagrimas_galapagos_464x261_bbc_nocredit.jpg"
+                            alt="Muro de las Lagrimas" class="h-56 w-full object-cover">
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-2xl font-black text-white">Bicicleta al Muro de las Lagrimas</h3>
+                    </div>
+                </article>
+                <article class="tt-reveal tt-lift overflow-hidden rounded-[2rem] border border-emerald-100 bg-emerald-50 text-slate-900">
+                    <div class="tt-image overflow-hidden">
+                        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR6JrgVnqXGbVqOE-5guVmASaCz77sjtdciww&s"
+                            alt="Ferry Interislas" class="h-56 w-full object-cover">
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-2xl font-black">Ferry Interislas</h3>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <section class="py-20">
+        <div class="mx-auto max-w-7xl px-6">
+            <div class="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+                <div class="tt-reveal tt-card rounded-[2rem] border border-slate-200 bg-white p-8 md:p-10">
+                    <p class="text-xs font-black uppercase tracking-[0.3em] text-primary">Tour de Bahia Tintoreras</p>
+                    <h2 class="mt-4 text-4xl font-black uppercase tracking-tight text-slate-900 md:text-5xl">
+                        Tour de Bahia - Snorkelling Las Tintoreras
+                    </h2>
+                    <p class="mt-6 text-base leading-8 text-slate-600">
+                        Ideal para quienes buscan una experiencia corta, accesible y llena de vida marina. Descubre la
+                        belleza natural de la bahia de Puerto Villamil en una experiencia que combina navegacion,
+                        caminata y snorkel en uno de los ecosistemas mas representativos de la isla Isabela.
+                    </p>
+
+                    <h3 class="mt-8 text-xl font-black uppercase tracking-tight text-slate-900">Descripcion de la experiencia</h3>
+                    <div class="mt-4 space-y-4 text-base leading-8 text-slate-600">
+                        <p>El tour inicia con un recorrido en embarcacion panga ride a traves de la bahia, donde, con un poco de suerte, podras observar algunas de las aves mas emblematicas de Galapagos como piqueros de patas azules, pelicanos, fragatas y el famoso pinguino de Galapagos.</p>
+                        <p>Posteriormente, visitaremos el islote Las Tintoreras, donde realizaremos una caminata corta sobre formaciones de lava volcanica. Este sitio permite entender como se forman las islas volcanicas en sus primeras etapas, ademas de ser uno de los principales lugares de anidacion de iguanas marinas.</p>
+                        <p>Durante la caminata, tambien podremos observar un canal natural donde los tiburones de arrecife de punta blanca, conocidos como tintoreras, descansan durante el dia, especialmente en epocas de aguas frias.</p>
+                        <p>Luego, regresamos a la embarcacion para prepararnos para la actividad de snorkel. Se proporcionara el equipo necesario junto con una breve explicacion para garantizar una experiencia segura y agradable.</p>
+                        <p>En el agua, exploraremos un entorno marino lleno de vida, donde es posible observar peces de arrecife, tortugas marinas y, con algo de suerte, tiburones y rayas.</p>
+                        <p>Es importante recordar que este es un entorno natural abierto, por lo que la presencia de fauna depende de las condiciones del momento.</p>
+                    </div>
+                </div>
+
+                <div class="grid gap-5">
+                    <div class="tt-reveal tt-image tt-card overflow-hidden rounded-[2rem] border border-slate-200 bg-white">
+                        <img src="https://dynamic-media-cdn.tripadvisor.com/media/photo-o/0c/18/1f/db/photo0jpg.jpg?w=1200&h=1200&s=1"
+                            alt="Bahia y snorkel en Isabela" class="h-[320px] w-full object-cover">
+                    </div>
+                    <div class="tt-reveal rounded-[1.8rem] bg-primary-dark p-6 text-white">
+                        <h3 class="text-lg font-black uppercase tracking-tight">Incluye</h3>
+                        <ul class="mt-4 space-y-2 text-sm leading-7 text-slate-200">
+                            <li>Transporte pick up y drop off desde hotel o muelle</li>
+                            <li>Guia bilingue certificado</li>
+                            <li>Equipo de snorkel mascara y aletas</li>
+                            <li>Chaleco salvavidas</li>
+                            <li>Snack galleta</li>
+                            <li>Toallas a bordo</li>
+                        </ul>
+                    </div>
+                    <div class="tt-reveal rounded-[1.8rem] border border-slate-200 bg-white p-6">
+                        <h3 class="text-lg font-black uppercase tracking-tight text-slate-900">No incluye</h3>
+                        <ul class="mt-4 space-y-2 text-sm leading-7 text-slate-600">
+                            <li>Traje de neopreno wetsuit</li>
+                            <li>Alimentacion completa</li>
+                            <li>Propinas</li>
+                            <li>Servicios no especificados</li>
+                        </ul>
+                    </div>
+                    <div class="tt-reveal rounded-[1.8rem] border border-emerald-100 bg-emerald-50 p-6">
+                        <h3 class="text-lg font-black uppercase tracking-tight text-slate-900">Recomendaciones</h3>
+                        <ul class="mt-4 space-y-2 text-sm leading-7 text-slate-700">
+                            <li>Traer traje de bano</li>
+                            <li>Protector solar biodegradable</li>
+                            <li>Camara acuatica opcional</li>
+                            <li>Ropa comoda, zapatos cerrados o sandalias</li>
+                        </ul>
+                    </div>
+                    <div class="tt-reveal rounded-[1.8rem] border border-slate-200 bg-white p-6">
+                        <h3 class="text-lg font-black uppercase tracking-tight text-slate-900">Informacion importante</h3>
+                        <ul class="mt-4 space-y-2 text-sm leading-7 text-slate-600">
+                            <li>Duracion: aproximadamente 2 a 3 horas</li>
+                            <li>Capacidad del bote: 16 pax</li>
+                            <li>Nivel de dificultad: facil</li>
+                            <li>Caminata corta y de baja dificultad sobre terreno volcanico irregular</li>
+                            <li>Snorkel apto para principiantes con instrucciones previas</li>
+                            <li>Edad recomendada: a partir de 5 anos</li>
+                            <li>Idiomas: espanol / ingles</li>
+                            <li>Horarios: AM y PM</li>
+                        </ul>
+                        <p class="mt-4 text-sm leading-7 text-slate-600">
+                            Nota importante: este tour se realiza en un entorno natural protegido. Los animales se
+                            encuentran en libertad, por lo que no se puede garantizar su avistamiento en todo momento.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="pb-24">
+        <div class="mx-auto max-w-7xl px-6">
+            <div class="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-start">
+                <div class="tt-reveal tt-card rounded-[2rem] border border-slate-200 bg-white p-8 md:p-10">
+                    <p class="text-xs font-black uppercase tracking-[0.3em] text-primary">Tour Volcan Sierra Negra</p>
+                    <h2 class="mt-4 text-4xl font-black uppercase tracking-tight text-slate-900 md:text-5xl">
+                        Volcan Sierra Negra
+                    </h2>
+                    <p class="mt-6 text-base leading-8 text-slate-600">
+                        Descubre uno de los paisajes volcanicos mas impresionantes de Galapagos en una experiencia que
+                        combina aventura, geologia y vistas unicas.
+                    </p>
+                    <p class="mt-3 text-sm font-black uppercase tracking-[0.2em] text-primary">Salidas: todos los dias</p>
+
+                    <h3 class="mt-8 text-xl font-black uppercase tracking-tight text-slate-900">Descripcion de la experiencia</h3>
+                    <div class="mt-4 space-y-4 text-base leading-8 text-slate-600">
+                        <p>El tour inicia a las 7:30 am desde el parque central de Puerto Villamil, donde partimos en transporte hacia las tierras altas de la isla.</p>
+                        <p>Despues de un recorrido aproximado de 45 minutos, llegamos al punto de control conocido como El Cura, donde realizamos el registro correspondiente y una breve parada para el uso de servicios basicos.</p>
+                        <p>Desde aqui comienza la aventura hacia el Volcan Sierra Negra, uno de los volcanes activos mas grandes del mundo, famoso por su enorme caldera.</p>
+                        <p>Este volcan ofrece dos formas diferentes de exploracion, adaptadas a distintos intereses y niveles de experiencia.</p>
+                    </div>
+                </div>
+
+                <div class="grid gap-5">
+                    <div class="tt-reveal tt-image tt-card overflow-hidden rounded-[2rem] border border-slate-200 bg-white">
+                        <img src="https://aquaventuresgps.com/wp-content/uploads/2021/10/volcan-sierra-negra-isabela-galapagos-min.jpg"
+                            alt="Volcan Sierra Negra en Isabela" class="h-[300px] w-full object-cover">
+                    </div>
+                    <article class="tt-reveal rounded-[1.8rem] border border-slate-200 bg-white p-6">
+                        <h3 class="text-xl font-black uppercase tracking-tight text-slate-900">Opcion 1: Sierra Negra + Volcan Chico</h3>
+                        <p class="mt-4 text-sm leading-7 text-slate-600">Embarcate en una aventura unica hacia el Volcan Sierra Negra y continua hasta Volcan Chico, donde el paisaje se transforma completamente en un escenario volcanico impresionante.</p>
+                        <p class="mt-4 text-sm leading-7 text-slate-600">Este recorrido comprende una caminata total de aproximadamente 16 km 10 millas, ideal para viajeros que disfrutan del senderismo y buscan una experiencia activa en contacto con la naturaleza.</p>
+                        <p class="mt-4 text-sm leading-7 text-slate-600">Durante la caminata, atravesaras diferentes ecosistemas: comenzando con zonas de vegetacion donde existe la posibilidad de observar aves como el pajaro brujo little vermilion flycatcher, seguido de terrenos con ligeras pendientes y tramos planos.</p>
+                        <p class="mt-4 text-sm leading-7 text-slate-600">A medida que avanzamos hacia Volcan Chico, el entorno cambia drasticamente a un paisaje mas arido, con mayor exposicion al sol y formaciones de lava volcanica que crean un escenario unico, casi de otro planeta.</p>
+                        <p class="mt-4 text-sm leading-7 text-slate-600">Debido a la distancia y al tiempo disponible regreso aproximado a la 1:00 pm, el ritmo de caminata es de intensidad media a rapida.</p>
+                        <h4 class="mt-5 text-sm font-black uppercase tracking-[0.2em] text-primary">Incluye</h4>
+                        <ul class="mt-3 space-y-2 text-sm leading-7 text-slate-600">
+                            <li>Transporte desde Puerto Villamil hasta el sector El Cura</li>
+                            <li>Guia bilingue certificado</li>
+                            <li>Snack ligero sanduche y fruta</li>
+                        </ul>
+                        <h4 class="mt-5 text-sm font-black uppercase tracking-[0.2em] text-primary">Recomendaciones</h4>
+                        <ul class="mt-3 space-y-2 text-sm leading-7 text-slate-600">
+                            <li>Zapatos cerrados y comodos para caminata</li>
+                            <li>Protector solar</li>
+                            <li>Suficiente agua</li>
+                            <li>Gorra o sombrero</li>
+                            <li>Gafas de sol</li>
+                            <li>Chaqueta impermeable rain jacket</li>
+                        </ul>
+                    </article>
+                    <article class="tt-reveal rounded-[1.8rem] bg-primary-dark p-6 text-white">
+                        <h3 class="text-xl font-black uppercase tracking-tight">Opcion 2: Sierra Negra + Minas de Azufre</h3>
+                        <p class="mt-4 text-sm leading-7 text-slate-200">Explora una de las zonas mas activas del Volcan Sierra Negra en una experiencia que combina geologia, aventura y paisajes unicos.</p>
+                        <p class="mt-4 text-sm leading-7 text-slate-200">El tour inicia a las 7:30 am desde el parque central de Puerto Villamil, siguiendo el mismo recorrido hacia el sector El Cura, donde realizamos el registro y una breve parada para el uso de servicios basicos.</p>
+                        <p class="mt-4 text-sm leading-7 text-slate-200">Desde este punto, continuamos en transporte aproximadamente 10 km adicionales hasta llegar al inicio del sendero hacia las Minas de Azufre.</p>
+                        <p class="mt-4 text-sm leading-7 text-slate-200">La caminata tiene una distancia aproximada de 4 km en total 2 km de ida y 2 km de regreso. Aunque es mas corta que la opcion hacia Volcan Chico, presenta un nivel de dificultad moderado debido a una pendiente pronunciada durante el descenso y ascenso, combinada con algunos tramos planos.</p>
+                        <p class="mt-4 text-sm leading-7 text-slate-200">Durante el recorrido, atravesaras un entorno natural unico, incluyendo bosques de helechos caracteristicos de la zona. Al llegar al area de las fumarolas, podras observar el volcan en su estado activo, con emisiones de gases y depositos de azufre.</p>
+                        <p class="mt-4 text-sm leading-7 text-slate-200">En el trayecto de regreso, realizamos una visita breve a la Cueva de Sucre. El retorno a Puerto Villamil esta previsto alrededor de las 12:30 pm.</p>
+                        <h4 class="mt-5 text-sm font-black uppercase tracking-[0.2em] text-emerald-300">Incluye</h4>
+                        <ul class="mt-3 space-y-2 text-sm leading-7 text-slate-200">
+                            <li>Transporte terrestre</li>
+                            <li>Guia bilingue certificado</li>
+                            <li>Snack ligero sanduche, jugo, fruta y agua para rellenar</li>
+                        </ul>
+                        <h4 class="mt-5 text-sm font-black uppercase tracking-[0.2em] text-emerald-300">Recomendaciones</h4>
+                        <ul class="mt-3 space-y-2 text-sm leading-7 text-slate-200">
+                            <li>Zapatos cerrados y comodos para caminata</li>
+                            <li>Protector solar</li>
+                            <li>Gorra o sombrero</li>
+                            <li>Gafas de sol</li>
+                            <li>Chaqueta ligera impermeable o rompe vientos</li>
+                        </ul>
+                    </article>
+                </div>
+            </div>
+        </div>
+    </section>
 </div>
 
-<div class="max-w-7xl mx-auto px-6 -mt-10 relative z-10 pb-24">
-    <div class="grid md:grid-cols-2 gap-8 mb-20">
-        <div class="bg-white p-12 rounded-[3rem] shadow-xl border border-slate-100 transition-hover hover:scale-[1.02] duration-300">
-            <div class="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 text-primary">
-                <span class="material-icons text-3xl">rocket_launch</span>
-            </div>
-            <h2 class="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-4">Nuestra Misión</h2>
-            <p class="text-slate-600 leading-relaxed font-medium">
-                Brindar servicios turísticos de alta calidad, promoviendo el turismo sostenible y responsable, superando siempre las expectativas de nuestros clientes mediante un servicio personalizado y seguro.
-            </p>
-        </div>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const items = document.querySelectorAll('.tt-reveal');
+        if (!items.length) return;
 
-        <div class="bg-white p-12 rounded-[3rem] shadow-xl border border-slate-100 transition-hover hover:scale-[1.02] duration-300">
-            <div class="w-16 h-16 bg-slate-900/5 rounded-2xl flex items-center justify-center mb-6 text-slate-900">
-                <span class="material-icons text-3xl">visibility</span>
-            </div>
-            <h2 class="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-4">Nuestra Visión</h2>
-            <p class="text-slate-600 leading-relaxed font-medium">
-                Ser la agencia de viajes líder y más confiable de la región para el año 2030, reconocida por nuestra innovación tecnológica y nuestro compromiso inquebrantable con la conservación del medio ambiente.
-            </p>
-        </div>
-    </div>
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('is-visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, {
+            threshold: 0.12,
+            rootMargin: '0px 0px -40px 0px'
+        });
 
-    <div class="text-center mb-16">
-        <h2 class="text-4xl font-black text-slate-900 uppercase tracking-tighter mb-2">Nuestros Valores</h2>
-        <div class="w-20 h-2 bg-primary mx-auto rounded-full"></div>
-    </div>
-
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-        <div class="text-center p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
-            <span class="material-icons text-primary text-4xl mb-4">favorite</span>
-            <h4 class="font-black text-slate-900 uppercase text-sm tracking-widest">Pasión</h4>
-        </div>
-        <div class="text-center p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
-            <span class="material-icons text-primary text-4xl mb-4">shield</span>
-            <h4 class="font-black text-slate-900 uppercase text-sm tracking-widest">Seguridad</h4>
-        </div>
-        <div class="text-center p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
-            <span class="material-icons text-primary text-4xl mb-4">eco</span>
-            <h4 class="font-black text-slate-900 uppercase text-sm tracking-widest">Ecología</h4>
-        </div>
-        <div class="text-center p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
-            <span class="material-icons text-primary text-4xl mb-4">handshake</span>
-            <h4 class="font-black text-slate-900 uppercase text-sm tracking-widest">Confianza</h4>
-        </div>
-    </div>
-
-    <div class="mt-24 bg-primary rounded-[4rem] p-12 md:p-20 text-center text-white relative overflow-hidden">
-        <div class="relative z-10">
-            <h2 class="text-4xl md:text-5xl font-black uppercase tracking-tighter mb-6">¿Listo para empezar <br>tu próximo viaje?</h2>
-            <a href="{% url 'tours' %}" class="inline-block bg-white text-slate-900 px-10 py-4 rounded-2xl font-black text-xs tracking-widest uppercase hover:bg-slate-900 hover:text-white transition-all shadow-xl">
-                Ver todos los tours
-            </a>
-        </div>
-        <div class="absolute -bottom-10 -right-10 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
-    </div>
-</div>
+        items.forEach((item, index) => {
+            item.style.transitionDelay = `${Math.min(index * 35, 220)}ms`;
+            observer.observe(item);
+        });
+    });
+</script>
 
 {% endblock %}
