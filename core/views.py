@@ -1812,6 +1812,8 @@ def admin_reservas(request):
 
         if reserva.estado == "solicitud_agencia":
             reserva.estado_mostrar = "pendiente"
+        elif reserva.estado == ESTADO_COTIZACION_PENDIENTE:
+            reserva.estado_mostrar = "cotizacion lista" if (reserva.total_pagar or Decimal("0.00")) > 0 else "pendiente cotizacion"
         elif reserva.estado == "cotizada_agencia":
             reserva.estado_mostrar = "cotizada"
         elif reserva.estado == "confirmada_agencia":
@@ -1826,6 +1828,8 @@ def admin_reservas(request):
             reserva.estado_mostrar = "bloqueada agencia"
         else:
             reserva.estado_mostrar = reserva.estado
+        reserva.whatsapp_url_cliente = _whatsapp_reserva_interna_url(reserva) if _es_reserva_interna(reserva) and (reserva.total_pagar or Decimal("0.00")) > 0 else ""
+        reserva.whatsapp_cliente_disponible = bool(reserva.whatsapp_url_cliente)
 
     hoy = timezone.localdate()
     kpi_agencia = {
