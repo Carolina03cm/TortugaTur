@@ -25,8 +25,12 @@
             class="bg-white rounded-[3rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden flex flex-col lg:flex-row transition-all hover:scale-[1.01]">
 
             <div class="lg:w-96 h-72 lg:h-auto relative">
-                <img src="{{ tour.imagen.url|default:tour.destino.imagen_url }}" class="w-full h-full object-cover"
+                {% if tour.imagen_portada %}
+                <img src="{{ tour.imagen_portada }}" class="w-full h-full object-cover"
                     alt="{{ tour.nombre }}">
+                {% else %}
+                <div class="w-full h-full bg-slate-200 flex items-center justify-center text-slate-500">Sin imagen</div>
+                {% endif %}
                 <div
                     class="absolute top-6 left-6 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-2xl shadow-sm border border-white">
                     <!-- prettier-ignore -->

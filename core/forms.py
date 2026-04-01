@@ -10,18 +10,26 @@ import re
 class DestinoForm(forms.ModelForm):
     class Meta:
         model = Destino
-        # Solo estos dos campos existen en tu modelo Destino
-        fields = ['nombre', 'imagen_url'] 
+        fields = ['nombre', 'imagen', 'imagen_url']
         widgets = {
             'nombre': forms.TextInput(attrs={
                 'class': 'w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-primary',
                 'placeholder': 'Ej. Isla Santa Cruz'
+            }),
+            'imagen': forms.ClearableFileInput(attrs={
+                'class': 'w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-primary',
+                'accept': 'image/*'
             }),
             'imagen_url': forms.URLInput(attrs={
                 'class': 'w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-primary',
                 'placeholder': 'https://link-de-la-imagen.jpg'
             }),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['imagen'].required = False
+        self.fields['imagen_url'].required = False
 
 
 #destinotour

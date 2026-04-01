@@ -5,8 +5,14 @@
         <h1 class="text-3xl font-black mb-2">Editar Destino</h1>
         <p class="text-slate-500 mb-8 font-medium">Modificando: <span class="text-primary">{{ destino.nombre }}</span></p>
         
-        <form method="post" class="space-y-4">
+        <form method="post" enctype="multipart/form-data" class="space-y-4">
             {% csrf_token %}
+            {% if destino.obtener_imagen_url %}
+            <div class="mb-6">
+                <p class="text-xs font-black uppercase tracking-[0.16em] text-slate-500 mb-3">Imagen actual</p>
+                <img src="{{ destino.obtener_imagen_url }}" alt="{{ destino.nombre }}" class="w-full max-h-64 object-cover rounded-3xl border border-slate-200">
+            </div>
+            {% endif %}
             <div class="destino-form-edit">
                 {{ form.as_p }}
             </div>
@@ -29,6 +35,10 @@
         border-radius: 1rem;
         border: 1px solid #e2e8f0;
         margin-top: 0.5rem;
+    }
+    .destino-form-edit input[type="file"] {
+        padding: 0.75rem;
+        background: #f8fafc;
     }
 </style>
 {% endblock %}

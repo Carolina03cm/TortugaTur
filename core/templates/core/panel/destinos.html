@@ -29,7 +29,7 @@
         {% if not solo_lectura %}
         <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
           <h2 class="text-lg font-extrabold text-slate-900 mb-4">Nuevo destino</h2>
-          <form method="post" class="space-y-4">
+          <form method="post" enctype="multipart/form-data" class="space-y-4">
             {% csrf_token %}
             <div class="django-form-container">{{ form.as_p }}</div>
             <button type="submit" class="w-full h-11 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800">Guardar destino</button>
@@ -48,6 +48,7 @@
             <thead class="bg-slate-950 text-white text-[10px] uppercase tracking-[0.16em]">
               <tr>
                 <th class="px-6 py-4 text-left">Destino</th>
+                <th class="px-6 py-4 text-left">Imagen</th>
                 <th class="px-6 py-4 text-right">Acciones</th>
               </tr>
             </thead>
@@ -59,6 +60,13 @@
                     <span class="h-9 w-9 rounded-lg bg-slate-100 text-slate-600 inline-flex items-center justify-center"><span class="material-icons text-[18px]">place</span></span>
                     <span class="font-bold text-slate-900">{{ destino.nombre }}</span>
                   </div>
+                </td>
+                <td class="px-6 py-4">
+                  {% if destino.obtener_imagen_url %}
+                  <img src="{{ destino.obtener_imagen_url }}" alt="{{ destino.nombre }}" class="h-14 w-20 rounded-xl object-cover border border-slate-200">
+                  {% else %}
+                  <span class="text-xs font-bold text-slate-400">Sin imagen</span>
+                  {% endif %}
                 </td>
                 <td class="px-6 py-4 text-right">
                   {% if not solo_lectura %}
@@ -79,7 +87,7 @@
                 </td>
               </tr>
               {% empty %}
-              <tr><td colspan="2" class="px-6 py-14 text-center text-slate-500">No hay destinos registrados.</td></tr>
+              <tr><td colspan="3" class="px-6 py-14 text-center text-slate-500">No hay destinos registrados.</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -123,6 +131,10 @@
     outline: none;
     border-color: #0f766e;
     box-shadow: 0 0 0 3px rgba(15,118,110,.12);
+  }
+  .django-form-container p input[type="file"] {
+    padding: .75rem;
+    background: #f8fafc;
   }
 </style>
 {% endblock %}

@@ -273,8 +273,8 @@
     {% for tour in tours_destacados %}
     <div class="tt-reveal tt-lift bg-white dark:bg-slate-800 rounded-xl shadow hover:shadow-lg transition overflow-hidden border border-transparent dark:border-slate-700">
       <div class="h-48 w-full overflow-hidden">
-        {% if tour.destino.imagen_url %}
-        <img src="{{ tour.destino.imagen_url }}" alt="{{ tour.destino.nombre }}" class="w-full h-full object-cover">
+        {% if tour.destino.obtener_imagen_url %}
+        <img src="{{ tour.destino.obtener_imagen_url }}" alt="{{ tour.destino.nombre }}" class="w-full h-full object-cover">
         {% else %}
         <div class="h-48 flex items-center justify-center bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
           Sin imagen

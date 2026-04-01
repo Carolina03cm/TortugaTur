@@ -165,6 +165,26 @@ def _whatsapp_reserva_interna_url(reserva):
     return f"https://wa.me/{telefono}?{urlencode({'text': mensaje})}"
 
 
+def _asignar_imagen_portada_tours(tours):
+    tours = list(tours)
+    tour_ids = [tour.id for tour in tours if getattr(tour, "id", None)]
+    portada_map = {}
+    if tour_ids:
+        galerias = (
+            Galeria.objects.filter(tour_id__in=tour_ids)
+            .order_by("tour_id", "-fecha_agregada")
+        )
+        for foto in galerias:
+            if foto.tour_id not in portada_map:
+                portada_map[foto.tour_id] = foto.obtener_imagen_url()
+
+    for tour in tours:
+        destino_obj = getattr(tour, "destino", None)
+        destino_img = destino_obj.obtener_imagen_url() if destino_obj else ""
+        tour.imagen_portada = portada_map.get(tour.id, "") or destino_img
+    return tours
+
+
 def _calcular_limite_pago_agencia(fecha_reserva):
     """
     Regla de recordatorio mensual para agencias:
@@ -287,6 +307,7 @@ def home(request):
 
 def tours(request):
     tours = _filtrar_tours_para_usuario(Tour.objects.select_related("destino").all(), request.user)
+    tours = _asignar_imagen_portada_tours(tours)
     destinos = Destino.objects.all()
     currency_code, currency_rate = _currency_context(request)
     for tour in tours:
@@ -341,7 +362,8 @@ def lista_tours(request):
         tours_con_salidas[s.tour].append(s)
 
     currency_code, currency_rate = _currency_context(request)
-    for tour in tours_con_salidas.keys():
+    tours_lista = _asignar_imagen_portada_tours(tours_con_salidas.keys())
+    for tour in tours_lista:
         display = _tour_price_display(tour, currency_rate, request.user)
         tour.precio_adulto_display = display["adulto"]
         tour.precio_nino_display = display["nino"]
@@ -2589,7 +2611,7 @@ def destinos(request):
         if solo_lectura:
             messages.error(request, "Tu rol solo tiene permiso de lectura en destinos.")
             return redirect("destinos")
-        form = DestinoForm(request.POST)
+        form = DestinoForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
             messages.success(request, "Destino agregado con exito.")
@@ -2608,7 +2630,7 @@ def destinos(request):
 def editar_destino(request, pk):
     destino = get_object_or_404(Destino, pk=pk)
     if request.method == "POST":
-        form = DestinoForm(request.POST, instance=destino)
+        form = DestinoForm(request.POST, request.FILES, instance=destino)
         if form.is_valid():
             form.save()
             messages.success(request, "Destino actualizado con exito.")
@@ -4726,7 +4748,8 @@ def secretaria_reservar(request):
                 portada_map[g.tour_id] = g.obtener_imagen_url()
 
     for tour in todos_los_tours:
-        destino_img = getattr(getattr(tour, "destino", None), "imagen_url", "") or ""
+        destino_obj = getattr(tour, "destino", None)
+        destino_img = destino_obj.obtener_imagen_url() if destino_obj else ""
         tour.imagen_portada = destino_img or portada_map.get(tour.id, "")
     def _attach_child_prices(t):
         t.child_price_0_2 = _precio_nino_por_edad(0, tour=t, user=request.user)
@@ -4737,11 +4760,13 @@ def secretaria_reservar(request):
     for tour in todos_los_tours:
         _attach_child_prices(tour)
     for tour in list(tours_con_salidas.keys()):
-        destino_img = getattr(getattr(tour, "destino", None), "imagen_url", "") or ""
+        destino_obj = getattr(tour, "destino", None)
+        destino_img = destino_obj.obtener_imagen_url() if destino_obj else ""
         tour.imagen_portada = destino_img or portada_map.get(tour.id, "")
         _attach_child_prices(tour)
     for tour in list(tours_reserva_directa.keys()):
-        destino_img = getattr(getattr(tour, "destino", None), "imagen_url", "") or ""
+        destino_obj = getattr(tour, "destino", None)
+        destino_img = destino_obj.obtener_imagen_url() if destino_obj else ""
         tour.imagen_portada = destino_img or portada_map.get(tour.id, "")
         _attach_child_prices(tour)
 

@@ -9,7 +9,13 @@ from django.utils import timezone
 
 class Destino(models.Model):
     nombre = models.CharField(max_length=100)
-    imagen_url = models.URLField("Imagen (URL)", max_length=500)
+    imagen = models.ImageField(upload_to='destinos/', blank=True, null=True)
+    imagen_url = models.URLField("Imagen (URL)", max_length=500, blank=True, default="")
+
+    def obtener_imagen_url(self):
+        if self.imagen:
+            return self.imagen.url
+        return self.imagen_url or ""
 
     def __str__(self):
         return self.nombre
