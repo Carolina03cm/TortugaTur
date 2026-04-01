@@ -858,6 +858,9 @@ def checkout(request, reserva_id=None):
 def es_admin(user):
     return user.is_staff or user.is_superuser
 
+def es_superadmin(user):
+    return user.is_authenticated and user.is_superuser
+
 def es_secretaria(user):
     return user.is_authenticated and user.groups.filter(name__iexact=GROUP_SECRETARIA).exists()
 
@@ -3009,8 +3012,76 @@ def panel_inicio(request):
             "reservas": data_reservas,
             "ingresos": data_ingresos,
         }),
+        "puede_reiniciar_operacion": request.user.is_superuser,
+        "conteo_operacion_pruebas": {
+            "salidas": SalidaTour.objects.count(),
+            "reservas": Reserva.objects.count(),
+            "pagos": Pago.objects.count(),
+            "tickets": Ticket.objects.count(),
+        },
     }
     return render(request, "core/panel/index.html", context)
+
+
+@login_required
+@user_passes_test(es_superadmin)
+def reinicio_operacion_panel(request):
+    context = {
+        "conteo_operacion_pruebas": {
+            "salidas": SalidaTour.objects.count(),
+            "reservas": Reserva.objects.count(),
+            "pagos": Pago.objects.count(),
+            "tickets": Ticket.objects.count(),
+        },
+    }
+    return render(request, "core/panel/reinicio_operacion.html", context)
+
+
+@login_required
+@user_passes_test(es_superadmin)
+@require_POST
+def reiniciar_operacion_pruebas(request):
+    confirmacion = (request.POST.get("confirmacion_reset") or "").strip().upper()
+    password = request.POST.get("confirmacion_password") or ""
+    acknowledged = request.POST.get("confirmacion_entendida") == "on"
+
+    if confirmacion != "REINICIAR OPERACION":
+        messages.error(request, 'Escribe exactamente "REINICIAR OPERACION" para confirmar el reinicio.')
+        return redirect("reinicio_operacion_panel")
+
+    if not request.user.check_password(password):
+        messages.error(request, "La contrasena actual no es valida. No se realizaron cambios.")
+        return redirect("reinicio_operacion_panel")
+
+    if not acknowledged:
+        messages.error(request, "Debes confirmar que entiendes que esta accion es irreversible.")
+        return redirect("reinicio_operacion_panel")
+
+    salidas_count = SalidaTour.objects.count()
+    reservas_count = Reserva.objects.count()
+    pagos_count = Pago.objects.count()
+    tickets_count = Ticket.objects.count()
+
+    with transaction.atomic():
+        SalidaTour.objects.all().delete()
+
+    logger.warning(
+        "Reinicio operativo ejecutado por superusuario=%s (id=%s). Eliminadas %s salidas, %s reservas, %s pagos y %s tickets.",
+        request.user.username,
+        request.user.id,
+        salidas_count,
+        reservas_count,
+        pagos_count,
+        tickets_count,
+    )
+
+    messages.success(
+        request,
+        f"Reinicio completado. Se eliminaron {salidas_count} salida(s), "
+        f"{reservas_count} reserva(s), {pagos_count} pago(s) y {tickets_count} ticket(s). "
+        "Los tours y destinos se conservaron.",
+    )
+    return redirect("reinicio_operacion_panel")
 
 
 @login_required

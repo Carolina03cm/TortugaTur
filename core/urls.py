@@ -16,6 +16,8 @@ urlpatterns = [
     path('preguntas-frecuentes/', views.faq, name='faq'),
 
     path("panel/", views.panel_inicio, name="panel_admin"),
+    path("panel/reinicio-operacion/", views.reinicio_operacion_panel, name="reinicio_operacion_panel"),
+    path("panel/reiniciar-operacion/", views.reiniciar_operacion_pruebas, name="reiniciar_operacion_pruebas"),
     path("panel/reservas/", views.admin_reservas, name="admin_reservas"),
     path("panel/reservas/estado/json/", views.admin_reservas_estado_json, name="admin_reservas_estado_json"),
     path("panel/agencias-sin-pago/", views.admin_agencias_sin_pago, name="admin_agencias_sin_pago"),

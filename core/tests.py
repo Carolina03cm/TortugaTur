@@ -1,11 +1,13 @@
 from decimal import Decimal
 
+from decimal import Decimal
+
 from django.test import Client
 from django.contrib.auth.models import Group, User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Destino, Reserva, SalidaTour, SiteVisit, Tour
+from .models import Destino, Pago, Reserva, SalidaTour, SiteVisit, Ticket, Tour
 
 
 class CheckoutSecurityTests(TestCase):
@@ -260,3 +262,123 @@ class SiteVisitByIpTests(TestCase):
         self.assertEqual(SiteVisit.objects.count(), 1)
         self.assertEqual(SiteVisit.objects.first().ip_address, "10.0.0.8")
         self.assertContains(response, ">1<", html=False)
+
+
+class ReinicioOperacionPruebasTests(TestCase):
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username="root",
+            email="root@example.com",
+            password="pass12345",
+        )
+        self.staff = User.objects.create_user(
+            username="staff",
+            email="staff@example.com",
+            password="pass12345",
+            is_staff=True,
+        )
+
+        destino = Destino.objects.create(
+            nombre="San Cristobal",
+            imagen_url="https://example.com/san-cristobal.jpg",
+        )
+        self.tour = Tour.objects.create(
+            nombre="Tour Reset",
+            destino=destino,
+            descripcion="Tour de prueba para reinicio",
+            precio=Decimal("80.00"),
+            precio_adulto=Decimal("80.00"),
+            precio_nino=Decimal("50.00"),
+            cupo_maximo=10,
+            cupos_disponibles=10,
+        )
+        self.salida = SalidaTour.objects.create(
+            tour=self.tour,
+            fecha="2030-03-20",
+            cupo_maximo=10,
+            cupos_disponibles=8,
+        )
+        self.reserva = Reserva.objects.create(
+            salida=self.salida,
+            adultos=2,
+            ninos=0,
+            total_pagar=Decimal("160.00"),
+            nombre="Cliente",
+            apellidos="Reset",
+            correo="cliente@example.com",
+            telefono="0999999999",
+            identificacion="1234567890",
+            estado="pagada",
+        )
+        Pago.objects.create(
+            reserva=self.reserva,
+            proveedor="efectivo",
+            estado="paid",
+            monto=Decimal("160.00"),
+        )
+        Ticket.objects.create(
+            reserva=self.reserva,
+            codigo="RST-0001",
+        )
+
+    def test_staff_no_superuser_no_puede_reiniciar(self):
+        self.client.login(username="staff", password="pass12345")
+
+        response = self.client.post(
+            reverse("reiniciar_operacion_pruebas"),
+            {
+                "confirmacion_reset": "REINICIAR OPERACION",
+                "confirmacion_password": "pass12345",
+                "confirmacion_entendida": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(SalidaTour.objects.count(), 1)
+        self.assertEqual(Reserva.objects.count(), 1)
+        self.assertEqual(Pago.objects.count(), 1)
+        self.assertEqual(Ticket.objects.count(), 1)
+
+    def test_superuser_requiere_password_y_frase_exacta(self):
+        self.client.login(username="root", password="pass12345")
+
+        response = self.client.post(
+            reverse("reiniciar_operacion_pruebas"),
+            {
+                "confirmacion_reset": "REINICIAR",
+                "confirmacion_password": "incorrecta",
+                "confirmacion_entendida": "on",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Escribe exactamente "REINICIAR OPERACION"')
+        self.assertEqual(SalidaTour.objects.count(), 1)
+        self.assertEqual(Reserva.objects.count(), 1)
+        self.assertEqual(Pago.objects.count(), 1)
+        self.assertEqual(Ticket.objects.count(), 1)
+        self.assertEqual(Tour.objects.count(), 1)
+        self.assertEqual(Destino.objects.count(), 1)
+
+    def test_superuser_puede_reiniciar_sin_borrar_tours_ni_destinos(self):
+        self.client.login(username="root", password="pass12345")
+
+        response = self.client.post(
+            reverse("reiniciar_operacion_pruebas"),
+            {
+                "confirmacion_reset": "REINICIAR OPERACION",
+                "confirmacion_password": "pass12345",
+                "confirmacion_entendida": "on",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Los tours y destinos se conservaron.")
+        self.assertEqual(SalidaTour.objects.count(), 0)
+        self.assertEqual(Reserva.objects.count(), 0)
+        self.assertEqual(Pago.objects.count(), 0)
+        self.assertEqual(Ticket.objects.count(), 0)
+        self.assertEqual(Tour.objects.count(), 1)
+        self.assertEqual(Destino.objects.count(), 1)
